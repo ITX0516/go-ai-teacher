@@ -8,7 +8,7 @@
 - 🧩 **死活题训练**：分类题库，AI 讲解，错题回顾
 - 📊 **棋谱复盘**：胜率曲线，AI 建议，手顺回放
 - 📚 **分级课程**：从入门到高级，系统化学习
-- 🤖 **Kimi AI 老师**：棋理讲解，问答互动，复盘总结
+- 🤖 **DeepSeek AI 老师**：棋理讲解，问答互动，复盘总结
 - 🏆 **成就系统**：等级经验，连续打卡，徽章收集
 
 ## 技术栈
@@ -33,7 +33,7 @@ flutter run             # 移动端运行
 
 ### 连接真实后端
 
-如需使用 KataGo 强 AI + Kimi 真实讲解，启动 Go 后端后修改 `lib/main.dart`：
+如需使用 KataGo 强 AI + DeepSeek 真实讲解，启动 Go 后端后修改 `lib/main.dart`：
 
 ```dart
 // 把 MockApiService 换成 ApiService
@@ -69,7 +69,7 @@ lib/
 - 本地开发默认：`http://10.0.2.2:8080` (Android 模拟器)
 - Web 开发：`http://localhost:8080`
 
-## 配置 Kimi AI
+## 配置 DeepSeek AI
 
-在后端 `.env` 文件中配置 `KIMI_API_KEY` 即可启用真实 AI 讲解。
+在后端 `.env` 文件中配置 `DEEPSEEK_API_KEY` 即可启用真实 AI 讲解。
 未配置时使用演示模式的模拟回复。

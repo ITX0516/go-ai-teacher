@@ -1,5 +1,5 @@
 name: go_teacher_flutter
-description: 围棋AI老师 - 基于KataGo和Kimi的智能围棋教学平台
+description: 围棋AI老师 - 基于KataGo和DeepSeek的智能围棋教学平台
 publish_to: 'none'
 version: 1.0.0+1
 

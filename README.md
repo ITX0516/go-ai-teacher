@@ -1,6 +1,6 @@
 # 围棋 AI 老师 (Go AI Teacher)
 
-基于 **Flutter + Go + KataGo + Kimi AI** 的智能围棋教学平台。
+基于 **Flutter + Go + KataGo + DeepSeek AI** 的智能围棋教学平台。
 
 ## 项目结构
 
@@ -15,7 +15,7 @@
 │   │   └── services/        # 业务逻辑
 │   │       ├── game_service.go     # 游戏管理
 │   │       ├── katago_service.go   # KataGo 引擎封装
-│   │       ├── kimi_service.go     # Kimi AI 讲解
+│   │       ├── deepseek_service.go     # DeepSeek AI 讲解
 │   │       ├── puzzle_service.go   # 死活题库
 │   │       └── user_service.go     # 用户与成就系统
 │   ├── go.mod
@@ -43,7 +43,7 @@
 - 🧩 **死活题训练**：分类题库（死活/吃子/定式），AI 讲解，错题回顾
 - 📊 **棋谱复盘**：胜率曲线、AI 推荐走法、手顺回放、整体复盘总结
 - 📚 **分级课程**：从入门到高级，系统化学习路径
-- 🤖 **Kimi AI 老师**：棋理讲解、走子点评、问答互动、复盘总结
+- 🤖 **DeepSeek AI 老师**：棋理讲解、走子点评、问答互动、复盘总结
 - 🏆 **成就系统**：等级经验、连续打卡、9 个成就徽章
 
 ## 技术架构
@@ -58,14 +58,14 @@
                                           │                  │
                                           ▼                  ▼
                                    ┌──────────┐       ┌────────────┐
-                                   │ KataGo   │       │  Kimi AI   │
+                                   │ KataGo   │       │  DeepSeek AI   │
                                    │ 围棋引擎 │       │  讲解引擎  │
                                    │ (量化)   │       │ (自然语言) │
                                    └──────────┘       └────────────┘
 ```
 
 **KataGo** 负责计算量化数据（胜率、目差、最佳走法），
-**Kimi** 把冰冷数字翻译成通俗易懂的棋理讲解。
+**DeepSeek** 把冰冷数字翻译成通俗易懂的棋理讲解。
 
 ## 快速开始
 
@@ -73,7 +73,7 @@
 
 ```bash
 cd go_teacher
-cp .env.example .env  # 配置 KIMI_API_KEY
+cp .env.example .env  # 配置 DEEPSEEK_API_KEY
 go mod tidy
 go run cmd/server/main.go
 # 服务启动在 http://localhost:8080
@@ -94,7 +94,7 @@ flutter run -d chrome   # Web 运行
 | `POST /api/games/:id` | 创建对局 |
 | `POST /api/games/:id/move` | 落子 |
 | `POST /api/games/:id/ai-move` | AI 走棋 |
-| `POST /api/games/:id/explain` | Kimi 讲解走子 |
+| `POST /api/games/:id/explain` | DeepSeek 讲解走子 |
 | `POST /api/games/:id/ask` | 向 AI 提问 |
 | `POST /api/games/summary` | 整局复盘总结 |
 | `GET /api/puzzles` | 获取题目列表 |

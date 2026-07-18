@@ -9,13 +9,13 @@ import (
 
 type PuzzleHandler struct {
 	puzzleService *services.PuzzleService
-	kimiService   *services.KimiService
+	deepseekService   *services.DeepSeekService
 }
 
-func NewPuzzleHandler(ps *services.PuzzleService, ks *services.KimiService) *PuzzleHandler {
+func NewPuzzleHandler(ps *services.PuzzleService, ks *services.DeepSeekService) *PuzzleHandler {
 	return &PuzzleHandler{
 		puzzleService: ps,
-		kimiService:   ks,
+		deepseekService:   ks,
 	}
 }
 
@@ -59,7 +59,7 @@ func (h *PuzzleHandler) CheckAnswer(c *gin.Context) {
 			break
 		}
 	}
-	explanation, _ := h.kimiService.GeneratePuzzleExplanation(puzzle, isCorrect, req.Move)
+	explanation, _ := h.deepseekService.GeneratePuzzleExplanation(puzzle, isCorrect, req.Move)
 	c.JSON(http.StatusOK, gin.H{
 		"correct":     isCorrect,
 		"explanation": explanation,

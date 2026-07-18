@@ -9,32 +9,32 @@ import (
 	"net/http"
 )
 
-type KimiService struct {
+type DeepSeekService struct {
 	apiKey string
 	apiURL string
 	client *http.Client
 }
 
-func NewKimiService(apiKey, apiURL string) *KimiService {
-	return &KimiService{
+func NewDeepSeekService(apiKey, apiURL string) *DeepSeekService {
+	return &DeepSeekService{
 		apiKey: apiKey,
 		apiURL: apiURL,
 		client: &http.Client{},
 	}
 }
 
-type kimiMessage struct {
+type deepseekMessage struct {
 	Role    string `json:"role"`
 	Content string `json:"content"`
 }
 
-type kimiRequest struct {
+type deepseekRequest struct {
 	Model    string        `json:"model"`
-	Messages []kimiMessage `json:"messages"`
+	Messages []deepseekMessage `json:"messages"`
 	Stream   bool          `json:"stream"`
 }
 
-type kimiResponse struct {
+type deepseekResponse struct {
 	Choices []struct {
 		Message struct {
 			Content string `json:"content"`
@@ -45,7 +45,7 @@ type kimiResponse struct {
 	} `json:"error,omitempty"`
 }
 
-func (s *KimiService) ExplainMove(move string, moveNumber int, winRateChange float64, gameContext string) (*models.Explanation, error) {
+func (s *DeepSeekService) ExplainMove(move string, moveNumber int, winRateChange float64, gameContext string) (*models.Explanation, error) {
 	prompt := fmt.Sprintf(`你是一位专业的围棋老师，请用通俗易懂的语言讲解这步棋。
 
 背景信息：
@@ -83,7 +83,7 @@ func (s *KimiService) ExplainMove(move string, moveNumber int, winRateChange flo
 	}, nil
 }
 
-func (s *KimiService) ExplainPosition(gameSGF string, userQuestion string) (string, error) {
+func (s *DeepSeekService) ExplainPosition(gameSGF string, userQuestion string) (string, error) {
 	prompt := fmt.Sprintf(`你是一位专业的围棋老师。以下是当前棋局的SGF棋谱：
 %s
 
@@ -94,7 +94,7 @@ func (s *KimiService) ExplainPosition(gameSGF string, userQuestion string) (stri
 	return s.chat(prompt)
 }
 
-func (s *KimiService) AnalyzeGameSummary(sgf string, result string) (string, error) {
+func (s *DeepSeekService) AnalyzeGameSummary(sgf string, result string) (string, error) {
 	prompt := fmt.Sprintf(`你是一位专业的围棋老师，请对下面这盘棋做一个整体复盘总结。
 
 棋谱SGF：
@@ -114,7 +114,7 @@ func (s *KimiService) AnalyzeGameSummary(sgf string, result string) (string, err
 	return s.chat(prompt)
 }
 
-func (s *KimiService) GeneratePuzzleExplanation(puzzle *models.Puzzle, isCorrect bool, userMove string) (string, error) {
+func (s *DeepSeekService) GeneratePuzzleExplanation(puzzle *models.Puzzle, isCorrect bool, userMove string) (string, error) {
 	prompt := fmt.Sprintf(`你是一位耐心的围棋死活题老师。
 
 题目：%s
@@ -134,15 +134,15 @@ func (s *KimiService) GeneratePuzzleExplanation(puzzle *models.Puzzle, isCorrect
 	return s.chat(prompt)
 }
 
-func (s *KimiService) chat(userMessage string) (string, error) {
+func (s *DeepSeekService) chat(userMessage string) (string, error) {
 	if s.apiKey == "" {
 		return s.mockResponse(userMessage), nil
 	}
 
-	reqBody := kimiRequest{
-		Model:  "moonshot-v1-8k",
+	reqBody := deepseekRequest{
+		Model:  "deepseek-chat",
 		Stream: false,
-		Messages: []kimiMessage{
+		Messages: []deepseekMessage{
 			{Role: "system", Content: "你是一位专业的围棋老师，精通围棋棋理、死活、定式、布局、中盘、官子等各方面知识。你擅长用通俗易懂的语言讲解复杂的围棋概念，语气友好、耐心、鼓励。"},
 			{Role: "user", Content: userMessage},
 		},
@@ -171,7 +171,7 @@ func (s *KimiService) chat(userMessage string) (string, error) {
 		return "", fmt.Errorf("failed to read response: %w", err)
 	}
 
-	var result kimiResponse
+	var result deepseekResponse
 	if err := json.Unmarshal(body, &result); err != nil {
 		return "", fmt.Errorf("failed to parse response: %w", err)
 	}
@@ -187,7 +187,7 @@ func (s *KimiService) chat(userMessage string) (string, error) {
 	return result.Choices[0].Message.Content, nil
 }
 
-func (s *KimiService) mockResponse(userMessage string) string {
+func (s *DeepSeekService) mockResponse(userMessage string) string {
 	return fmt.Sprintf(`【围棋老师讲解】
 
 📖 棋理分析：
@@ -205,5 +205,5 @@ func (s *KimiService) mockResponse(userMessage string) string {
 继续保持思考的习惯，多分析每步棋的目的和意义。随着练习增多，你对局面的判断会越来越准确！
 
 ---
-注：当前为演示模式，配置 KIMI_API_KEY 后将接入真实 AI 讲解。`)
+注：当前为演示模式，配置 DEEPSEEK_API_KEY 后将接入真实 AI 讲解。`)
 }

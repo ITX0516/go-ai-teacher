@@ -1,12 +1,12 @@
 # 围棋AI老师 - 后端服务
 
-基于 Go + KataGo + Kimi AI 的围棋教学平台后端。
+基于 Go + KataGo + DeepSeek AI 的围棋教学平台后端。
 
 ## 功能特性
 
 - AI 对弈（多难度级别）
 - 实时棋局分析（胜率、目差、推荐走法）
-- Kimi AI 棋理讲解
+- DeepSeek AI 棋理讲解
 - 死活题/定式训练题库
 - 棋谱复盘分析
 - SGF 棋谱导出
@@ -16,7 +16,7 @@
 - Go 1.25+
 - Gin Web 框架
 - KataGo 围棋引擎
-- Kimi (Moonshot) AI 大模型
+- DeepSeek (DeepSeek) AI 大模型
 
 ## 快速开始
 
@@ -39,7 +39,7 @@ go run cmd/server/main.go
 - `POST /api/games/:id/undo` - 悔棋
 - `GET /api/games/:id/analyze` - 分析当前局面
 - `GET /api/games/:id/sgf` - 导出 SGF
-- `POST /api/games/:id/explain` - Kimi 讲解走子
+- `POST /api/games/:id/explain` - DeepSeek 讲解走子
 - `POST /api/games/:id/ask` - 向 AI 提问
 
 ### 题库相关
@@ -52,8 +52,8 @@ go run cmd/server/main.go
 
 ```env
 PORT=8080
-KIMI_API_KEY=your_kimi_api_key
-KIMI_API_URL=https://api.moonshot.cn/v1/chat/completions
+DEEPSEEK_API_KEY=your_deepseek_api_key
+DEEPSEEK_API_URL=https://api.deepseek.cn/v1/chat/completions
 KATAGO_PATH=./katago/katago
 KATAGO_MODEL=./katago/model.bin.gz
 ```

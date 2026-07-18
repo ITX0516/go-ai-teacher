@@ -11,14 +11,14 @@ import (
 type GameHandler struct {
 	gameService    *services.GameService
 	kataGoService  *services.KataGoService
-	kimiService    *services.KimiService
+	deepseekService    *services.DeepSeekService
 }
 
-func NewGameHandler(gs *services.GameService, ks *services.KataGoService, kimi *services.KimiService) *GameHandler {
+func NewGameHandler(gs *services.GameService, ks *services.KataGoService, deepseek *services.DeepSeekService) *GameHandler {
 	return &GameHandler{
 		gameService:   gs,
 		kataGoService: ks,
-		kimiService:   kimi,
+		deepseekService:   deepseek,
 	}
 }
 
@@ -173,7 +173,7 @@ func (h *GameHandler) ExplainMove(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	explanation, err := h.kimiService.ExplainMove(req.Move, req.MoveNumber, req.WinRateChange, req.Context)
+	explanation, err := h.deepseekService.ExplainMove(req.Move, req.MoveNumber, req.WinRateChange, req.Context)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -192,7 +192,7 @@ func (h *GameHandler) AskQuestion(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	answer, err := h.kimiService.ExplainPosition(req.GameSGF, req.Question)
+	answer, err := h.deepseekService.ExplainPosition(req.GameSGF, req.Question)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -224,7 +224,7 @@ func (h *GameHandler) GameSummary(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	summary, err := h.kimiService.AnalyzeGameSummary(req.SGF, req.Result)
+	summary, err := h.deepseekService.AnalyzeGameSummary(req.SGF, req.Result)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

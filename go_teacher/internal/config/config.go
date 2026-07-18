@@ -9,8 +9,8 @@ type Config struct {
 	Port        int
 	KataGoPath  string
 	KataGoModel string
-	KimiAPIKey  string
-	KimiAPIURL  string
+	DeepSeekAPIKey  string
+	DeepSeekAPIURL  string
 }
 
 func Load() *Config {
@@ -19,8 +19,8 @@ func Load() *Config {
 		Port:        port,
 		KataGoPath:  getEnv("KATAGO_PATH", "./katago/katago"),
 		KataGoModel: getEnv("KATAGO_MODEL", "./katago/model.bin.gz"),
-		KimiAPIKey:  getEnv("KIMI_API_KEY", ""),
-		KimiAPIURL:  getEnv("KIMI_API_URL", "https://api.moonshot.cn/v1/chat/completions"),
+		DeepSeekAPIKey:  getEnv("DEEPSEEK_API_KEY", ""),
+		DeepSeekAPIURL:  getEnv("DEEPSEEK_API_URL", "https://api.deepseek.com/chat/completions"),
 	}
 }
 

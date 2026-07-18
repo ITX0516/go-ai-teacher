@@ -19,12 +19,12 @@ func main() {
 
 	gameService := services.NewGameService()
 	kataGoService := services.NewKataGoService(false)
-	kimiService := services.NewKimiService(cfg.KimiAPIKey, cfg.KimiAPIURL)
+	deepseekService := services.NewDeepSeekService(cfg.DeepSeekAPIKey, cfg.DeepSeekAPIURL)
 	puzzleService := services.NewPuzzleService()
 	userService := services.NewUserService()
 
-	gameHandler := handlers.NewGameHandler(gameService, kataGoService, kimiService)
-	puzzleHandler := handlers.NewPuzzleHandler(puzzleService, kimiService)
+	gameHandler := handlers.NewGameHandler(gameService, kataGoService, deepseekService)
+	puzzleHandler := handlers.NewPuzzleHandler(puzzleService, deepseekService)
 	userHandler := handlers.NewUserHandler(userService)
 
 	r := gin.Default()

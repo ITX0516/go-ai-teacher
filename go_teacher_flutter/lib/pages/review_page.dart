@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../widgets/go_board.dart';
-import '../services/api_service.dart';
+import '../services/game_service.dart';
 import '../models/game_models.dart';
 
 class ReviewPage extends StatefulWidget {
@@ -38,7 +38,7 @@ class _ReviewPageState extends State<ReviewPage> {
   Future<void> _initReview() async {
     setState(() => _isLoading = true);
     try {
-      final api = context.read<ApiService>();
+      final api = context.read<GameService>();
       var game = await api.newGame(_gameId, boardSize: 19, komi: 6.5);
 
       for (final move in sampleMoves) {
@@ -66,7 +66,7 @@ class _ReviewPageState extends State<ReviewPage> {
 
   Future<void> _analyzePosition() async {
     try {
-      final api = context.read<ApiService>();
+      final api = context.read<GameService>();
       final result = await api.analyze(_gameId);
       if (mounted) {
         setState(() => _analysis = result);
@@ -77,7 +77,7 @@ class _ReviewPageState extends State<ReviewPage> {
   Future<void> _generateSummary() async {
     setState(() => _showSummary = true);
     try {
-      final api = context.read<ApiService>();
+      final api = context.read<GameService>();
       final summary = await api.gameSummary('', '黑中盘胜');
       if (mounted) setState(() => _summary = summary);
     } catch (e) {

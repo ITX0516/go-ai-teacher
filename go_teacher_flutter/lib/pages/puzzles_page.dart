@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../widgets/go_board.dart';
-import '../services/api_service.dart';
+import '../services/game_service.dart';
 import '../models/game_models.dart';
 
 class PuzzlesPage extends StatefulWidget {
@@ -44,7 +44,7 @@ class _PuzzlesPageState extends State<PuzzlesPage> {
   Future<void> _loadPuzzles() async {
     setState(() => _isLoading = true);
     try {
-      final api = context.read<ApiService>();
+      final api = context.read<GameService>();
       final puzzles = await api.getPuzzles(
         category: _selectedCategory,
         difficulty: _selectedDifficulty,
@@ -180,7 +180,7 @@ class _PuzzlesPageState extends State<PuzzlesPage> {
 
     setState(() => _isLoading = true);
     try {
-      final api = context.read<ApiService>();
+      final api = context.read<GameService>();
       final result = await api.checkPuzzleAnswer(_currentPuzzle!.id, moveStr);
       setState(() {
         _feedback = result['explanation'];

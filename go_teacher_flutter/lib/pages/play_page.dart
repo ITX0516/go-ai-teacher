@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../widgets/go_board.dart';
-import '../services/api_service.dart';
+import '../services/game_service.dart';
 import '../models/game_models.dart';
 
 class PlayPage extends StatefulWidget {
@@ -33,7 +33,7 @@ class _PlayPageState extends State<PlayPage> {
   Future<void> _initGame() async {
     setState(() => _isLoading = true);
     try {
-      final api = context.read<ApiService>();
+      final api = context.read<GameService>();
       final game = await api.newGame(_gameId, boardSize: 19, komi: 6.5);
       setState(() => _gameState = game);
       if (_playerColor == 2) {
@@ -53,7 +53,7 @@ class _PlayPageState extends State<PlayPage> {
 
     setState(() => _isLoading = true);
     try {
-      final api = context.read<ApiService>();
+      final api = context.read<GameService>();
       final result = await api.playMove(_gameId, x, y, _playerColor);
       setState(() {
         _gameState = result['game'];
@@ -72,7 +72,7 @@ class _PlayPageState extends State<PlayPage> {
     if (_gameState == null) return;
     setState(() => _isAiThinking = true);
     try {
-      final api = context.read<ApiService>();
+      final api = context.read<GameService>();
       final aiColor = 3 - _playerColor;
       final result = await api.aiMove(_gameId, aiColor, difficulty: _difficulty);
       setState(() {
@@ -90,7 +90,7 @@ class _PlayPageState extends State<PlayPage> {
     if (_gameState == null) return;
     setState(() => _isLoading = true);
     try {
-      final api = context.read<ApiService>();
+      final api = context.read<GameService>();
       final game = await api.undoMove(_gameId);
       setState(() => _gameState = game);
     } catch (e) {
@@ -105,7 +105,7 @@ class _PlayPageState extends State<PlayPage> {
     final lastMove = _gameState!.moves.last;
     setState(() => _isLoading = true);
     try {
-      final api = context.read<ApiService>();
+      final api = context.read<GameService>();
       final exp = await api.explainMove(
         _gameId,
         lastMove.move,
@@ -171,7 +171,7 @@ class _PlayPageState extends State<PlayPage> {
               if (q.isEmpty) return;
               setState(() => _isLoading = true);
               try {
-                final api = context.read<ApiService>();
+                final api = context.read<GameService>();
                 final answer = await api.askQuestion(_gameId, '', q);
                 setState(() => _explanation = answer);
                 _showExplanationDialog();

@@ -1,8 +1,9 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/game_models.dart';
+import 'game_service.dart';
 
-class ApiService {
+class ApiService implements GameService {
   final String baseUrl;
   final http.Client _client;
 

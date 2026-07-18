@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'services/api_service.dart';
+import 'services/game_service.dart';
+import 'services/mock_api_service.dart';
 import 'pages/home_page.dart';
 import 'pages/play_page.dart';
 import 'pages/puzzles_page.dart';
@@ -16,8 +17,8 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Provider<ApiService>(
-      create: (_) => ApiService(baseUrl: 'http://10.0.2.2:8080'),
+    return Provider<GameService>(
+      create: (_) => MockApiService(),
       child: MaterialApp(
         title: '围棋AI老师',
         debugShowCheckedModeBanner: false,

@@ -1,0 +1,50 @@
+# ===== Go 后端 =====
+go_teacher/bin/
+go_teacher/*.exe
+go_teacher/vendor/
+*.test
+*.out
+.env
+.env.local
+
+# ===== Flutter 前端 =====
+go_teacher_flutter/.dart_tool/
+go_teacher_flutter/.packages
+go_teacher_flutter/.pub-cache/
+go_teacher_flutter/.pub/
+go_teacher_flutter/build/
+go_teacher_flutter/.flutter-plugins
+go_teacher_flutter/.flutter-plugins-dependencies
+go_teacher_flutter/.metadata
+go_teacher_flutter/ios/Pods/
+go_teacher_flutter/android/.gradle/
+go_teacher_flutter/android/local.properties
+go_teacher_flutter/android/app/debug
+go_teacher_flutter/android/app/profile
+go_teacher_flutter/android/app/release
+go_teacher_flutter/ios/Flutter/Flutter.framework
+go_teacher_flutter/ios/Flutter/Flutter.podspec
+go_teacher_flutter/linux/flutter/ephemeral
+go_teacher_flutter/macos/Flutter/ephemeral
+go_teacher_flutter/windows/flutter/ephemeral
+
+# ===== Flutter SDK（本地下载，不入库） =====
+flutter-sdk/
+
+# ===== IDE / 编辑器 =====
+.idea/
+.vscode/
+*.iml
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# ===== 日志与临时文件 =====
+*.log
+logs/
+tmp/
+.temp/
+
+# ===== 占位文件 =====
+.placeholder

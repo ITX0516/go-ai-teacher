@@ -48,8 +48,8 @@ class _ReviewPageState extends State<ReviewPage> {
 
       setState(() {
         _gameState = game;
-        _analysis = game != null ? null : null;
-        _currentMoveIndex = game!.moves.length - 1;
+        _analysis = null;
+        _currentMoveIndex = game.moves.length - 1;
       });
 
       _analyzePosition();

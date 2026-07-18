@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import '../widgets/go_board.dart';
-import '../models/game_models.dart';
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
@@ -248,20 +246,21 @@ class HomePage extends StatelessWidget {
             ),
             child: LayoutBuilder(
               builder: (context, constraints) {
-              return Stack(
-                children: [
-                  Container(
-                    width: constraints.maxWidth * 0.35,
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF2D5016), Color(0xFF4A7C28)],
+                return Stack(
+                  children: [
+                    Container(
+                      width: constraints.maxWidth * 0.35,
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF2D5016), Color(0xFF4A7C28)],
+                        ),
+                        borderRadius: BorderRadius.circular(4),
                       ),
-                      borderRadius: BorderRadius.circular(4),
                     ),
-                  ),
-                ],
-              );
-            },
+                  ],
+                );
+              },
+            ),
           ),
           const SizedBox(height: 8),
           const Row(
@@ -317,44 +316,45 @@ class HomePage extends StatelessWidget {
           const SizedBox(width: 16),
           Expanded(
             child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE67E22),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Text(
-                  '每日一题',
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE67E22),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Text(
+                    '每日一题',
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                '中级死活题：倒扑的妙用',
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF8B4513),
+                const SizedBox(height: 8),
+                const Text(
+                  '中级死活题：倒扑的妙用',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF8B4513),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 4),
-              const Text(
-                '黑先，利用倒扑技巧吃子',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Color(0xFFA0522D),
+                const SizedBox(height: 4),
+                const Text(
+                  '黑先，利用倒扑技巧吃子',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFFA0522D),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 

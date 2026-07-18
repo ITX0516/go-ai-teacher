@@ -1,5 +1,5 @@
 import 'dart:math' as math;
-import 'game_models.dart';
+import '../models/game_models.dart';
 
 class GoEngine {
   final int boardSize;

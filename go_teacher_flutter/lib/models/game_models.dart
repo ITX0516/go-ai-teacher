@@ -43,6 +43,7 @@ class GameState {
   final double komi;
   final int currentPlayer;
   final String? result;
+  final String? winner;
 
   GameState({
     required this.boardSize,
@@ -51,6 +52,7 @@ class GameState {
     required this.komi,
     required this.currentPlayer,
     this.result,
+    this.winner,
   });
 
   factory GameState.fromJson(Map<String, dynamic> json) {
@@ -71,6 +73,7 @@ class GameState {
       komi: (json['komi'] ?? 6.5).toDouble(),
       currentPlayer: json['current'] ?? 1,
       result: json['result'],
+      winner: json['winner'],
     );
   }
 
@@ -81,7 +84,8 @@ class GameState {
       'moves': moves.map((m) => m.toJson()).toList(),
       'komi': komi,
       'current': currentPlayer,
-      if (result != null) 'result': result,
+      'result': result,
+      'winner': winner,
     };
   }
 }

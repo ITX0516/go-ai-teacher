@@ -2,10 +2,17 @@ import 'dart:math' as math;
 import '../models/game_models.dart';
 import 'go_engine.dart';
 import 'game_service.dart';
+import 'deepseek_service.dart';
 
 class MockApiService implements GameService {
   final Map<String, GoEngine> _games = {};
   final math.Random _rand = math.Random();
+  final DeepSeekService? _deepSeek;
+
+  MockApiService({String? deepSeekApiKey})
+      : _deepSeek = deepSeekApiKey != null && deepSeekApiKey.isNotEmpty
+            ? DeepSeekService(apiKey: deepSeekApiKey)
+            : null;
 
   Future<GameState> newGame(String gameId, {int boardSize = 19, double komi = 6.5}) async {
     await Future.delayed(const Duration(milliseconds: 100));
@@ -85,6 +92,14 @@ class MockApiService implements GameService {
     return engine.toGameState();
   }
 
+  Future<GameState> resign(String gameId, int color) async {
+    await Future.delayed(const Duration(milliseconds: 50));
+    final engine = _games[gameId];
+    if (engine == null) throw Exception('Game not found');
+    engine.resign(color);
+    return engine.toGameState();
+  }
+
   Future<AnalysisResult> analyze(String gameId) async {
     await Future.delayed(const Duration(milliseconds: 200));
     final engine = _games[gameId];
@@ -99,6 +114,22 @@ class MockApiService implements GameService {
     double winRateChange,
     String context,
   ) async {
+    if (_deepSeek != null) {
+      try {
+        final engine = _games[gameId];
+        final sgf = engine != null ? _engineToSgf(engine) : null;
+        final text = await _deepSeek!.explainMove(move, moveNumber, context, sgf);
+        return Explanation(
+          move: move,
+          explanation: text,
+          level: 'great',
+          tips: '由 DeepSeek AI 提供讲解',
+        );
+      } catch (e) {
+        // Fall through to mock
+      }
+    }
+
     await Future.delayed(const Duration(milliseconds: 400));
 
     final explanations = [
@@ -125,6 +156,14 @@ class MockApiService implements GameService {
   }
 
   Future<String> askQuestion(String gameId, String gameSgf, String question) async {
+    if (_deepSeek != null) {
+      try {
+        return await _deepSeek!.askQuestion(question, gameSgf);
+      } catch (e) {
+        // Fall through to mock
+      }
+    }
+
     await Future.delayed(const Duration(milliseconds: 500));
 
     final q = question.toLowerCase();
@@ -188,6 +227,14 @@ class MockApiService implements GameService {
   }
 
   Future<String> gameSummary(String sgf, String result) async {
+    if (_deepSeek != null) {
+      try {
+        return await _deepSeek!.gameSummary(sgf, result);
+      } catch (e) {
+        // Fall through to mock
+      }
+    }
+
     await Future.delayed(const Duration(milliseconds: 600));
     return '''这是一局精彩的对局！以下是 AI 老师的复盘总结：
 
@@ -432,6 +479,21 @@ class MockApiService implements GameService {
         solution: '黑下F4位（一间低夹）或G3位（飞压）都是常见的定式选择。一间低夹比较积极主动，飞压则取外势。选择哪种取决于你的布局策略。',
       ),
     ];
+  }
+
+  String _engineToSgf(GoEngine engine) {
+    final letters = 'ABCDEFGHJKLMNOPQRST';
+    final size = engine.boardSize;
+    var sgf = '(;GM[1]FF[4]SZ[$size]';
+    for (var i = 0; i < engine.moves.length; i++) {
+      final move = engine.moves[i];
+      final color = move.color == GoStone.black ? 'B' : 'W';
+      final cx = move.x < size ? letters[move.x] : '';
+      final cy = move.y < size ? String.fromCharCode(97 + size - 1 - move.y) : '';
+      sgf += ';$color[$cx$cy]';
+    }
+    sgf += ')';
+    return sgf;
   }
 }
 

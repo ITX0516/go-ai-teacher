@@ -13,6 +13,9 @@ class GoBoard extends StatelessWidget {
   final int? lastMoveY;
   final List<String>? hintMoves;
   final Map<String, double>? moveWinRates;
+  final int? selectedX;
+  final int? selectedY;
+  final int? selectedColor;
 
   const GoBoard({
     super.key,
@@ -27,6 +30,9 @@ class GoBoard extends StatelessWidget {
     this.lastMoveY,
     this.hintMoves,
     this.moveWinRates,
+    this.selectedX,
+    this.selectedY,
+    this.selectedColor,
   });
 
   @override
@@ -34,79 +40,89 @@ class GoBoard extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final size = constraints.maxWidth;
-        final coordSize = showCoordinates ? size * 0.05 : 0.0;
-        final boardPixelSize = size - coordSize * 2;
-        final cellSize = boardPixelSize / (boardSize - 1);
+        final coordSize = showCoordinates ? size * 0.045 : 0.0;
+        final boardAreaSize = size - coordSize * 2;
+        final pad = padding ?? boardAreaSize * 0.025;
+        final actualBoardSize = boardAreaSize - pad * 2;
+        final cellSize = actualBoardSize / (boardSize - 1);
         final stoneSize = cellSize * 0.95;
-        final pad = padding ?? cellSize * 0.3;
+        final boardLeft = coordSize + pad;
+        final boardTop = coordSize + pad;
 
-        return Container(
-          width: size,
-          height: size,
-          decoration: BoxDecoration(
-            color: const Color(0xFFDEB887),
-            borderRadius: BorderRadius.circular(4),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.2),
-                blurRadius: 8,
-                offset: const Offset(2, 4),
+        return Listener(
+          behavior: HitTestBehavior.opaque,
+          onPointerUp: (event) {
+            if (onTap == null) return;
+            final dx = event.localPosition.dx - boardLeft;
+            final dy = event.localPosition.dy - boardTop;
+            final x = (dx / cellSize).round();
+            final y = (dy / cellSize).round();
+            if (x >= 0 && x < boardSize && y >= 0 && y < boardSize) {
+              onTap!(x, y);
+            }
+          },
+          child: Container(
+            width: size,
+            height: size,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(6),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  const Color(0xFFE8C88B),
+                  const Color(0xFFDDB26E),
+                ],
               ),
-            ],
-          ),
-          child: Stack(
-            children: [
-              if (showCoordinates) _buildCoordinates(size, coordSize, cellSize, pad),
-              Positioned(
-                left: coordSize + pad,
-                top: coordSize + pad,
-                child: SizedBox(
-                  width: boardPixelSize - pad * 2,
-                  height: boardPixelSize - pad * 2,
-                  child: CustomPaint(
-                    size: Size(boardPixelSize - pad * 2, boardPixelSize - pad * 2),
-                    painter: _BoardPainter(
-                      boardSize: boardSize,
-                      cellSize: (boardPixelSize - pad * 2) / (boardSize - 1),
-                    ),
-                  ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.25),
+                  blurRadius: 10,
+                  offset: const Offset(2, 4),
                 ),
-              ),
-              ..._buildStones(boardPixelSize, cellSize, stoneSize, coordSize, pad),
-              if (onTap != null)
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.1),
+                  blurRadius: 2,
+                  offset: const Offset(1, 1),
+                ),
+              ],
+            ),
+            child: Stack(
+              children: [
+                if (showCoordinates) _buildCoordinates(size, coordSize, cellSize, boardLeft, boardTop),
                 Positioned(
-                  left: coordSize + pad,
-                  top: coordSize + pad,
-                  child: GestureDetector(
-                    onTapUp: (details) {
-                      final localDx = details.localPosition.dx;
-                      final localDy = details.localPosition.dy;
-                      final x = (localDx / cellSize).round();
-                      final y = (localDy / cellSize).round();
-                      if (x >= 0 && x < boardSize && y >= 0 && y < boardSize) {
-                        onTap!(x, y);
-                      }
-                    },
-                    child: SizedBox(
-                      width: boardPixelSize - pad * 2,
-                      height: boardPixelSize - pad * 2,
+                  left: boardLeft,
+                  top: boardTop,
+                  child: SizedBox(
+                    width: actualBoardSize,
+                    height: actualBoardSize,
+                    child: CustomPaint(
+                      size: Size(actualBoardSize, actualBoardSize),
+                      painter: _BoardPainter(
+                        boardSize: boardSize,
+                        cellSize: cellSize,
+                      ),
                     ),
                   ),
                 ),
-            ],
+                ..._buildStones(boardLeft, boardTop, cellSize, stoneSize),
+                if (selectedX != null && selectedY != null && selectedColor != null)
+                  _buildSelectedStone(boardLeft, boardTop, cellSize, stoneSize),
+              ],
+            ),
           ),
         );
       },
     );
   }
 
-  Widget _buildCoordinates(double size, double coordSize, double cellSize, double pad) {
+  Widget _buildCoordinates(double size, double coordSize, double cellSize, double boardLeft, double boardTop) {
     final letters = _generateLetters(boardSize);
     return Stack(
       children: [
         for (int i = 0; i < boardSize; i++)
           Positioned(
-            left: coordSize + pad + i * cellSize - coordSize / 2,
+            left: boardLeft + i * cellSize - coordSize / 2,
             top: 0,
             child: SizedBox(
               width: coordSize,
@@ -115,9 +131,9 @@ class GoBoard extends StatelessWidget {
                 child: Text(
                   letters[i],
                   style: TextStyle(
-                    fontSize: coordSize * 0.5,
-                    color: Colors.black54,
-                    fontWeight: FontWeight.bold,
+                    fontSize: coordSize * 0.55,
+                    color: const Color(0xFF5D4037),
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
@@ -126,7 +142,7 @@ class GoBoard extends StatelessWidget {
         for (int i = 0; i < boardSize; i++)
           Positioned(
             left: 0,
-            top: coordSize + pad + i * cellSize - coordSize / 2,
+            top: boardTop + i * cellSize - coordSize / 2,
             child: SizedBox(
               width: coordSize,
               height: coordSize,
@@ -134,9 +150,9 @@ class GoBoard extends StatelessWidget {
                 child: Text(
                   '${boardSize - i}',
                   style: TextStyle(
-                    fontSize: coordSize * 0.5,
-                    color: Colors.black54,
-                    fontWeight: FontWeight.bold,
+                    fontSize: coordSize * 0.55,
+                    color: const Color(0xFF5D4037),
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
@@ -156,7 +172,7 @@ class GoBoard extends StatelessWidget {
     return letters;
   }
 
-  List<Widget> _buildStones(double boardPixelSize, double cellSize, double stoneSize, double coordSize, double pad) {
+  List<Widget> _buildStones(double boardLeft, double boardTop, double cellSize, double stoneSize) {
     final widgets = <Widget>[];
 
     for (int y = 0; y < boardSize; y++) {
@@ -164,8 +180,8 @@ class GoBoard extends StatelessWidget {
         final stone = board[y][x];
         if (stone == 0) continue;
 
-        final left = coordSize + pad + x * cellSize - stoneSize / 2;
-        final top = coordSize + pad + y * cellSize - stoneSize / 2;
+        final left = boardLeft + x * cellSize - stoneSize / 2;
+        final top = boardTop + y * cellSize - stoneSize / 2;
 
         final moveIndex = moves.indexWhere((m) => m.x == x && m.y == y);
         final moveNum = moveIndex >= 0 ? moveIndex + 1 : null;
@@ -186,8 +202,8 @@ class GoBoard extends StatelessWidget {
       for (final move in hintMoves!) {
         final coord = _moveToCoord(move);
         if (coord != null) {
-          final left = coordSize + pad + coord.$1 * cellSize - stoneSize / 2;
-          final top = coordSize + pad + coord.$2 * cellSize - stoneSize / 2;
+          final left = boardLeft + coord.$1 * cellSize - stoneSize / 2;
+          final top = boardTop + coord.$2 * cellSize - stoneSize / 2;
           final winRate = moveWinRates?[move];
           widgets.add(
             Positioned(
@@ -211,49 +227,78 @@ class GoBoard extends StatelessWidget {
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         gradient: RadialGradient(
-          center: Alignment(-0.3, -0.3),
-          radius: 0.8,
+          center: const Alignment(-0.35, -0.35),
+          radius: 0.75,
           colors: isBlack
               ? [
-                  Colors.grey[700]!,
-                  Colors.black,
+                  const Color(0xFF666666),
+                  const Color(0xFF1A1A1A),
+                  const Color(0xFF000000),
                 ]
               : [
                   Colors.white,
-                  Colors.grey[300]!,
+                  const Color(0xFFF5F5F5),
+                  const Color(0xFFE0E0E0),
                 ],
+          stops: isBlack ? [0.0, 0.5, 1.0] : [0.0, 0.7, 1.0],
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.4),
-            blurRadius: 3,
-            offset: const Offset(1, 2),
+            color: Colors.black.withValues(alpha: 0.35),
+            blurRadius: 4,
+            offset: const Offset(1.5, 2.5),
           ),
         ],
         border: isBlack
             ? null
-            : Border.all(color: Colors.grey[400]!, width: 0.5),
+            : Border.all(color: const Color(0xFFBDBDBD), width: 0.8),
       ),
       child: Center(
         child: isLastMove
             ? Container(
-                width: size * 0.3,
-                height: size * 0.3,
+                width: size * 0.28,
+                height: size * 0.28,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: isBlack ? Colors.red : Colors.red,
+                  color: isBlack ? Colors.white : Colors.red,
+                  border: Border.all(
+                    color: isBlack ? Colors.black : Colors.red.withValues(alpha: 0.5),
+                    width: 1.5,
+                  ),
                 ),
               )
             : (showMoveNumbers && moveNum != null
                 ? Text(
                     '$moveNum',
                     style: TextStyle(
-                      fontSize: size * 0.35,
+                      fontSize: size * 0.32,
                       fontWeight: FontWeight.bold,
                       color: isBlack ? Colors.white : Colors.black,
                     ),
                   )
                 : null),
+      ),
+    );
+  }
+
+  Widget _buildSelectedStone(double boardLeft, double boardTop, double cellSize, double stoneSize) {
+    final isBlack = selectedColor == 1;
+    final left = boardLeft + selectedX! * cellSize - stoneSize / 2;
+    final top = boardTop + selectedY! * cellSize - stoneSize / 2;
+    return Positioned(
+      left: left,
+      top: top,
+      child: Container(
+        width: stoneSize,
+        height: stoneSize,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: isBlack ? Colors.black.withValues(alpha: 0.4) : Colors.white.withValues(alpha: 0.6),
+          border: Border.all(
+            color: isBlack ? Colors.black : Colors.grey[600]!,
+            width: 2.5,
+          ),
+        ),
       ),
     );
   }
@@ -264,15 +309,15 @@ class GoBoard extends StatelessWidget {
       height: size,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: Colors.green.withValues(alpha: 0.5),
-        border: Border.all(color: Colors.green, width: 2),
+        color: const Color(0xFF4CAF50).withValues(alpha: 0.55),
+        border: Border.all(color: const Color(0xFF2E7D32), width: 2),
       ),
       child: Center(
         child: winRate != null
             ? Text(
                 '${winRate.toStringAsFixed(0)}%',
                 style: TextStyle(
-                  fontSize: size * 0.3,
+                  fontSize: size * 0.28,
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
                 ),
@@ -303,12 +348,12 @@ class _BoardPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final linePaint = Paint()
-      ..color = Colors.black
-      ..strokeWidth = 0.5;
+      ..color = const Color(0xFF2D1810)
+      ..strokeWidth = 0.8;
 
     final boldLinePaint = Paint()
-      ..color = Colors.black
-      ..strokeWidth = 1.0;
+      ..color = const Color(0xFF2D1810)
+      ..strokeWidth = 1.5;
 
     for (int i = 0; i < boardSize; i++) {
       final y = i * cellSize;
@@ -326,11 +371,11 @@ class _BoardPainter extends CustomPainter {
     }
 
     final starPoints = _getStarPoints(boardSize);
-    final starPaint = Paint()..color = Colors.black;
+    final starPaint = Paint()..color = const Color(0xFF2D1810);
     for (final point in starPoints) {
       final x = point.$1 * cellSize;
       final y = point.$2 * cellSize;
-      canvas.drawCircle(Offset(x, y), cellSize * 0.1, starPaint);
+      canvas.drawCircle(Offset(x, y), cellSize * 0.12, starPaint);
     }
   }
 

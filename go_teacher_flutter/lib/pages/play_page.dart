@@ -23,6 +23,8 @@ class _PlayPageState extends State<PlayPage> {
   bool _showAnalysis = false;
   String? _explanation;
   final TextEditingController _questionController = TextEditingController();
+  int? _selectedX;
+  int? _selectedY;
 
   @override
   void initState() {
@@ -46,12 +48,25 @@ class _PlayPageState extends State<PlayPage> {
     }
   }
 
-  Future<void> _playMove(int x, int y) async {
+  void _selectMove(int x, int y) {
     if (_gameState == null || _isAiThinking) return;
     if (_gameState!.currentPlayer != _playerColor) return;
     if (_gameState!.board[y][x] != 0) return;
+    setState(() {
+      _selectedX = x;
+      _selectedY = y;
+    });
+  }
 
-    setState(() => _isLoading = true);
+  Future<void> _confirmMove() async {
+    if (_selectedX == null || _selectedY == null) return;
+    final x = _selectedX!;
+    final y = _selectedY!;
+    setState(() {
+      _selectedX = null;
+      _selectedY = null;
+      _isLoading = true;
+    });
     try {
       final api = context.read<GameService>();
       final result = await api.playMove(_gameId, x, y, _playerColor);
@@ -64,8 +79,15 @@ class _PlayPageState extends State<PlayPage> {
     } catch (e) {
       _showError(e.toString());
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  void _cancelSelection() {
+    setState(() {
+      _selectedX = null;
+      _selectedY = null;
+    });
   }
 
   Future<void> _makeAiMove() async {
@@ -98,6 +120,71 @@ class _PlayPageState extends State<PlayPage> {
     } finally {
       setState(() => _isLoading = false);
     }
+  }
+
+  Future<void> _resign() async {
+    if (_gameState == null || _gameState!.result != null) return;
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('确认认输'),
+        content: const Text('确定要投子认输吗？'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('取消'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('认输'),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+    setState(() => _isLoading = true);
+    try {
+      final api = context.read<GameService>();
+      final game = await api.resign(_gameId, _playerColor);
+      setState(() => _gameState = game);
+      _showResultDialog();
+    } catch (e) {
+      _showError(e.toString());
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  void _showResultDialog() {
+    if (_gameState?.result == null) return;
+    final isWin = _gameState!.winner == (_playerColor == 1 ? 'black' : 'white');
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(
+              isWin ? Icons.emoji_events : Icons.sentiment_dissatisfied,
+              color: isWin ? Colors.amber : Colors.grey,
+            ),
+            const SizedBox(width: 8),
+            Text(isWin ? '你赢了！' : '再接再厉'),
+          ],
+        ),
+        content: Text(_gameState!.result!),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _initGame();
+            },
+            child: const Text('再来一局'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _explainLastMove() async {
@@ -230,7 +317,7 @@ class _PlayPageState extends State<PlayPage> {
             boardSize: _gameState!.boardSize,
             board: _gameState!.board,
             moves: _gameState!.moves,
-            onTap: _playMove,
+            onTap: _selectMove,
             lastMoveX: lastMove?.x,
             lastMoveY: lastMove?.y,
             hintMoves: _showHints && _analysis != null
@@ -239,13 +326,70 @@ class _PlayPageState extends State<PlayPage> {
             moveWinRates: _showHints && _analysis != null
                 ? {for (var m in _analysis!.topMoves) m.move: m.winRate}
                 : null,
+            selectedX: _selectedX,
+            selectedY: _selectedY,
+            selectedColor: _playerColor,
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
+          if (_selectedX != null && _selectedY != null) _buildConfirmBar(),
+          const SizedBox(height: 12),
           _buildGameInfo(),
           const SizedBox(height: 12),
           if (_showAnalysis && _analysis != null) _buildAnalysisPanel(),
           const SizedBox(height: 12),
           _buildControls(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildConfirmBar() {
+    final letter = String.fromCharCode(_selectedX! < 8 ? 65 + _selectedX! : 65 + _selectedX! + 1);
+    final moveLabel = '$letter${_gameState!.boardSize - _selectedY!}';
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF8E7),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE67E22)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.radio_button_checked, color: _playerColor == 1 ? Colors.black : Colors.white),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              '已选 $moveLabel，确认落子？',
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+                color: Color(0xFF8B4513),
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: _cancelSelection,
+            child: const Text('取消'),
+          ),
+          const SizedBox(width: 4),
+          ElevatedButton(
+            onPressed: _isLoading ? null : _confirmMove,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF2D5016),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: _isLoading
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                  )
+                : const Text('确认落子'),
+          ),
         ],
       ),
     );
@@ -518,6 +662,15 @@ class _PlayPageState extends State<PlayPage> {
                 label: _showAnalysis ? '隐藏分析' : 'AI分析',
                 onTap: () => setState(() => _showAnalysis = !_showAnalysis),
                 color: const Color(0xFF1E3A5F),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _controlButton(
+                icon: Icons.flag,
+                label: '认输',
+                onTap: _resign,
+                color: Colors.red,
               ),
             ),
           ],

@@ -6,6 +6,7 @@ abstract class GameService {
   Future<Map<String, dynamic>> playMove(String gameId, int x, int y, int color);
   Future<Map<String, dynamic>> aiMove(String gameId, int color, {String difficulty = 'medium'});
   Future<GameState> undoMove(String gameId);
+  Future<GameState> resign(String gameId, int color);
   Future<AnalysisResult> analyze(String gameId);
   Future<Explanation> explainMove(String gameId, String move, int moveNumber, double winRateChange, String context);
   Future<String> askQuestion(String gameId, String gameSgf, String question);

@@ -13,7 +13,8 @@ class ReviewPage extends StatefulWidget {
 
 class _ReviewPageState extends State<ReviewPage> {
   final String _gameId = 'review_${DateTime.now().millisecondsSinceEpoch}';
-  GameState? _gameState;
+  GameState? _fullGameState;
+  GameState? _displayGameState;
   AnalysisResult? _analysis;
   int _currentMoveIndex = -1;
   bool _isLoading = true;
@@ -47,7 +48,8 @@ class _ReviewPageState extends State<ReviewPage> {
       }
 
       setState(() {
-        _gameState = game;
+        _fullGameState = game;
+        _displayGameState = game;
         _analysis = null;
         _currentMoveIndex = game.moves.length - 1;
       });
@@ -88,27 +90,37 @@ class _ReviewPageState extends State<ReviewPage> {
   }
 
   void _goToMove(int index) {
-    if (_gameState == null) return;
-    if (index < -1 || index >= _gameState!.moves.length) return;
+    if (_fullGameState == null) return;
+    if (index < -1 || index >= _fullGameState!.moves.length) return;
 
-    final board = List.generate(_gameState!.boardSize, (_) => List.filled(_gameState!.boardSize, 0));
+    final board = List.generate(_fullGameState!.boardSize, (_) => List.filled(_fullGameState!.boardSize, 0));
     final moves = <MoveRecord>[];
     for (int i = 0; i <= index; i++) {
-      final m = _gameState!.moves[i];
+      final m = _fullGameState!.moves[i];
       board[m.y][m.x] = m.color;
       moves.add(m);
     }
 
     setState(() {
       _currentMoveIndex = index;
-      _gameState = GameState(
-        boardSize: _gameState!.boardSize,
+      _displayGameState = GameState(
+        boardSize: _fullGameState!.boardSize,
         board: board,
         moves: moves,
-        komi: _gameState!.komi,
+        komi: _fullGameState!.komi,
         currentPlayer: index % 2 == 0 ? 2 : 1,
       );
     });
+  }
+
+  void _handleBoardTap(int x, int y) {
+    if (_displayGameState == null) return;
+    final moveIndex = _displayGameState!.moves.indexWhere(
+      (m) => m.x == x && m.y == y,
+    );
+    if (moveIndex >= 0) {
+      _goToMove(moveIndex);
+    }
   }
 
   @override
@@ -133,12 +145,12 @@ class _ReviewPageState extends State<ReviewPage> {
   }
 
   Widget _buildBody() {
-    if (_gameState == null) {
+    if (_displayGameState == null) {
       return const Center(child: Text('加载失败'));
     }
 
-    final lastMove = _currentMoveIndex >= 0 && _currentMoveIndex < _gameState!.moves.length
-        ? _gameState!.moves[_currentMoveIndex]
+    final lastMove = _currentMoveIndex >= 0 && _currentMoveIndex < _displayGameState!.moves.length
+        ? _displayGameState!.moves[_currentMoveIndex]
         : null;
 
     return SingleChildScrollView(
@@ -148,12 +160,13 @@ class _ReviewPageState extends State<ReviewPage> {
           _buildWinRateBar(),
           const SizedBox(height: 12),
           GoBoard(
-            boardSize: _gameState!.boardSize,
-            board: _gameState!.board,
-            moves: _gameState!.moves,
+            boardSize: _displayGameState!.boardSize,
+            board: _displayGameState!.board,
+            moves: _displayGameState!.moves,
             showMoveNumbers: true,
             lastMoveX: lastMove?.x,
             lastMoveY: lastMove?.y,
+            onTap: _handleBoardTap,
           ),
           const SizedBox(height: 16),
           _buildMoveControls(),
@@ -251,7 +264,7 @@ class _ReviewPageState extends State<ReviewPage> {
         }),
         const SizedBox(width: 8),
         _controlButton(Icons.last_page, '终局', () {
-          _goToMove(_gameState!.moves.length - 1);
+          _goToMove(_displayGameState!.moves.length - 1);
         }),
       ],
     );
@@ -279,7 +292,7 @@ class _ReviewPageState extends State<ReviewPage> {
   }
 
   Widget _buildMoveSlider() {
-    final maxMoves = _gameState!.moves.length - 1;
+    final maxMoves = _displayGameState!.moves.length - 1;
     if (maxMoves < 0) return const SizedBox.shrink();
 
     return Column(
@@ -294,7 +307,7 @@ class _ReviewPageState extends State<ReviewPage> {
           activeColor: const Color(0xFF1E3A5F),
         ),
         Text(
-          '第 ${_currentMoveIndex + 1} 手 / 共 ${_gameState!.moves.length} 手',
+          '第 ${_currentMoveIndex + 1} 手 / 共 ${_displayGameState!.moves.length} 手',
           style: const TextStyle(fontSize: 12, color: Color(0xFF718096)),
         ),
       ],
@@ -402,8 +415,8 @@ class _ReviewPageState extends State<ReviewPage> {
           Wrap(
             spacing: 8,
             runSpacing: 8,
-            children: List.generate(_gameState!.moves.length, (index) {
-              final move = _gameState!.moves[index];
+            children: List.generate(_displayGameState!.moves.length, (index) {
+              final move = _displayGameState!.moves[index];
               final isSelected = index == _currentMoveIndex;
               final isBlack = move.color == 1;
               return GestureDetector(

@@ -9,6 +9,7 @@ class GoEngine {
   int currentPlayer = GoStone.black;
   int consecutivePasses = 0;
   String? result;
+  String? winner;
   final List<String> _boardHistory = [];
 
   GoEngine({this.boardSize = 19, this.komi = 6.5}) {
@@ -81,8 +82,14 @@ class GoEngine {
     currentPlayer = opponent;
 
     if (consecutivePasses >= 2) {
-      result = '双方连续虚着，对局结束';
+      _calculateFinalScore();
     }
+  }
+
+  void resign(int color) {
+    if (result != null) return;
+    winner = color == GoStone.black ? 'white' : 'black';
+    result = '${color == GoStone.black ? '黑方' : '白方'}投子认输';
   }
 
   void undo() {
@@ -177,6 +184,23 @@ class GoEngine {
     return board.map((row) => row.map((c) => c.toString()).join()).join('|');
   }
 
+  void _calculateFinalScore() {
+    final territory = countTerritory();
+    final blackScore = territory['black_territory']! + territory['black_stones']!;
+    final whiteScore = territory['white_territory']! + territory['white_stones']! + komi;
+
+    if (blackScore > whiteScore) {
+      winner = 'black';
+      result = '黑胜 ${(blackScore - whiteScore).toStringAsFixed(1)} 目';
+    } else if (whiteScore > blackScore) {
+      winner = 'white';
+      result = '白胜 ${(whiteScore - blackScore).toStringAsFixed(1)} 目';
+    } else {
+      winner = 'draw';
+      result = '和棋';
+    }
+  }
+
   Map<String, int> countTerritory() {
     final visited = List.generate(boardSize, (_) => List.filled(boardSize, false));
     int blackTerritory = 0;
@@ -242,6 +266,7 @@ class GoEngine {
       komi: komi,
       currentPlayer: currentPlayer,
       result: result,
+      winner: winner,
     );
   }
 }

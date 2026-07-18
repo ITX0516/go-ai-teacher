@@ -20,11 +20,24 @@
 
 ## 快速开始
 
+### 离线模式（推荐，开箱即用）
+
+前端内置纯 Dart 围棋引擎和模拟 AI，**无需后端即可完整体验所有功能**。
+
 ```bash
 cd go_teacher_flutter
 flutter pub get
 flutter run -d chrome   # Web 运行
 flutter run             # 移动端运行
+```
+
+### 连接真实后端
+
+如需使用 KataGo 强 AI + Kimi 真实讲解，启动 Go 后端后修改 `lib/main.dart`：
+
+```dart
+// 把 MockApiService 换成 ApiService
+create: (_) => ApiService(baseUrl: 'http://localhost:8080'),
 ```
 
 ## 项目结构
@@ -35,7 +48,10 @@ lib/
 ├── models/                # 数据模型
 │   └── game_models.dart
 ├── services/              # 服务层
-│   └── api_service.dart
+│   ├── game_service.dart  # 抽象接口（Mock/真实服务共用）
+│   ├── mock_api_service.dart  # Mock 离线服务
+│   ├── api_service.dart   # 真实后端 API 服务
+│   └── go_engine.dart     # 纯 Dart 围棋规则引擎 + SimpleAI
 ├── widgets/               # 公共组件
 │   └── go_board.dart      # 围棋棋盘组件
 ├── pages/                 # 页面

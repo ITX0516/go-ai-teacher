@@ -18,8 +18,6 @@ class _PuzzleDetailPageState extends State<PuzzleDetailPage> {
   late List<MoveRecord> _currentMoves;
   String? _feedback;
   bool _isCorrect = false;
-  int? _selectedX;
-  int? _selectedY;
   bool _isLoading = false;
 
   @override
@@ -41,24 +39,12 @@ class _PuzzleDetailPageState extends State<PuzzleDetailPage> {
       _currentMoves = moves;
       _feedback = null;
       _isCorrect = false;
-      _selectedX = null;
-      _selectedY = null;
     });
   }
 
-  void _selectMove(int x, int y) {
-    if (_isCorrect) return;
+  Future<void> _handleTap(int x, int y) async {
+    if (_isCorrect || _isLoading) return;
     if (_currentBoard[y][x] != 0) return;
-    setState(() {
-      _selectedX = x;
-      _selectedY = y;
-    });
-  }
-
-  Future<void> _confirmMove() async {
-    if (_selectedX == null || _selectedY == null) return;
-    final x = _selectedX!;
-    final y = _selectedY!;
 
     final letter = String.fromCharCode(x < 8 ? 65 + x : 65 + x + 1);
     final moveStr = '$letter${widget.puzzle.boardSize - y}';
@@ -66,8 +52,6 @@ class _PuzzleDetailPageState extends State<PuzzleDetailPage> {
     final board = List.generate(_currentBoard.length, (i) => List<int>.from(_currentBoard[i]));
     board[y][x] = 1;
     setState(() {
-      _selectedX = null;
-      _selectedY = null;
       _currentBoard = board;
       _currentMoves = [..._currentMoves, MoveRecord(x: x, y: y, color: 1, move: moveStr)];
     });
@@ -88,13 +72,6 @@ class _PuzzleDetailPageState extends State<PuzzleDetailPage> {
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
-  }
-
-  void _cancelSelection() {
-    setState(() {
-      _selectedX = null;
-      _selectedY = null;
-    });
   }
 
   void _showSolution() {
@@ -171,13 +148,8 @@ class _PuzzleDetailPageState extends State<PuzzleDetailPage> {
               boardSize: widget.puzzle.boardSize,
               board: _currentBoard,
               moves: _currentMoves,
-              onTap: _selectMove,
-              selectedX: _selectedX,
-              selectedY: _selectedY,
-              selectedColor: 1,
+              onTap: _handleTap,
             ),
-            const SizedBox(height: 12),
-            if (_selectedX != null && _selectedY != null) _buildConfirmBar(),
             const SizedBox(height: 12),
             if (_feedback != null) _buildFeedback(),
             const SizedBox(height: 16),
@@ -233,58 +205,6 @@ class _PuzzleDetailPageState extends State<PuzzleDetailPage> {
               fontWeight: FontWeight.bold,
               color: Color(0xFF2D3748),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildConfirmBar() {
-    final letter = String.fromCharCode(_selectedX! < 8 ? 65 + _selectedX! : 65 + _selectedX! + 1);
-    final moveLabel = '$letter${widget.puzzle.boardSize - _selectedY!}';
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFFF8E7),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE67E22)),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.radio_button_checked, color: Colors.black),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              '已选 $moveLabel，确认落子？',
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 14,
-                color: Color(0xFF8B4513),
-              ),
-            ),
-          ),
-          TextButton(
-            onPressed: _cancelSelection,
-            child: const Text('取消'),
-          ),
-          const SizedBox(width: 4),
-          ElevatedButton(
-            onPressed: _isLoading ? null : _confirmMove,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF8B4513),
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-            child: _isLoading
-                ? const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                  )
-                : const Text('确认落子'),
           ),
         ],
       ),

@@ -120,6 +120,14 @@ class _ReviewPageState extends State<ReviewPage> {
     );
     if (moveIndex >= 0) {
       _goToMove(moveIndex);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('点击已有棋子可跳转到对应手'),
+          duration: Duration(seconds: 1),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     }
   }
 

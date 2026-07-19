@@ -333,7 +333,9 @@ class GoBoard extends StatelessWidget {
     int x = letter.codeUnitAt(0) - 65;
     if (letter.codeUnitAt(0) >= 73) x--;
     final yStr = move.substring(1);
-    final y = boardSize - int.tryParse(yStr)!;
+    final yInt = int.tryParse(yStr);
+    if (yInt == null) return null;
+    final y = boardSize - yInt;
     if (x < 0 || x >= boardSize || y < 0 || y >= boardSize) return null;
     return (x, y);
   }

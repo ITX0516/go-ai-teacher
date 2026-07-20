@@ -36,47 +36,57 @@ class WinRateBar extends StatelessWidget {
               _playerIndicator(Colors.black, '黑'),
               const SizedBox(width: 8),
               Expanded(
-                child: Stack(
-                  children: [
-                    Container(
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final maxWidth = constraints.maxWidth;
+                    return SizedBox(
                       height: 16,
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.onSurface.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(8),
+                      child: Stack(
+                        children: [
+                          Container(
+                            height: 16,
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.onSurface.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          Container(
+                            height: 16,
+                            width: maxWidth * blackWinRate,
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [
+                                  theme.colorScheme.onSurface,
+                                  theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                                ],
+                                begin: Alignment.centerLeft,
+                                end: Alignment.centerRight,
+                              ),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          Positioned(
+                            left: maxWidth * blackWinRate,
+                            child: Container(
+                              height: 16,
+                              width: maxWidth * whiteWinRate,
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [
+                                    Colors.grey[300]!,
+                                    Colors.grey[200]!,
+                                  ],
+                                  begin: Alignment.centerLeft,
+                                  end: Alignment.centerRight,
+                                ),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                    Container(
-                      height: 16,
-                      width: '${(blackWinRate * 100).toStringAsFixed(1)}%',
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            theme.colorScheme.onSurface,
-                            theme.colorScheme.onSurface.withValues(alpha: 0.7),
-                          ],
-                          begin: Alignment.centerLeft,
-                          end: Alignment.centerRight,
-                        ),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                    Container(
-                      height: 16,
-                      width: '${(whiteWinRate * 100).toStringAsFixed(1)}%',
-                      margin: EdgeInsets.only(left: '${(blackWinRate * 100).toStringAsFixed(1)}%'),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            Colors.grey[300]!,
-                            Colors.grey[200]!,
-                          ],
-                          begin: Alignment.centerLeft,
-                          end: Alignment.centerRight,
-                        ),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                  ],
+                    );
+                  },
                 ),
               ),
               const SizedBox(width: 8),

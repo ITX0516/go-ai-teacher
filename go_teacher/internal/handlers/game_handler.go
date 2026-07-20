@@ -80,8 +80,7 @@ func (h *GameHandler) PlayMove(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	// 适配新接口：传空moves获取首步分析作为占位，避免前端崩溃
-	analysis, _ := h.kataGoService.Analyze([]services.MoveInput{}, game.BoardSize, int(color))
+	analysis, _ := h.kataGoService.Analyze(gameMovesToInputs(game), game.BoardSize, int(color))
 	c.JSON(http.StatusOK, gin.H{
 		"game":     services.GameStateToJSON(game),
 		"analysis": analysis,
@@ -108,8 +107,7 @@ func (h *GameHandler) AIMove(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "game not found"})
 		return
 	}
-	// 适配新接口：传空moves获取AI首步推荐
-	move, err := h.kataGoService.GenMove([]services.MoveInput{}, game.BoardSize, req.Color)
+	move, err := h.kataGoService.GenMove(gameMovesToInputs(game), game.BoardSize, req.Color)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -153,8 +151,7 @@ func (h *GameHandler) Analyze(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "game not found"})
 		return
 	}
-	// 适配新接口
-	analysis, _ := h.kataGoService.Analyze([]services.MoveInput{}, game.BoardSize, 1)
+	analysis, _ := h.kataGoService.Analyze(gameMovesToInputs(game), game.BoardSize, int(game.Current))
 	c.JSON(http.StatusOK, analysis)
 }
 
@@ -291,6 +288,35 @@ func (h *GameHandler) AIGenMove(c *gin.Context) {
 		"x":    x,
 		"y":    y,
 	})
+}
+
+func gameMovesToInputs(game *models.GameState) []services.MoveInput {
+	if game == nil || len(game.Moves) == 0 {
+		return []services.MoveInput{}
+	}
+	inputs := make([]services.MoveInput, len(game.Moves))
+	for i, m := range game.Moves {
+		color := 1
+		if int(m.Color) == 2 {
+			color = 2
+		}
+		inputs[i] = services.MoveInput{
+			X:     m.X,
+			Y:     m.Y,
+			Color: color,
+			Move:  coordToGTP(m.X, m.Y, game.BoardSize),
+		}
+	}
+	return inputs
+}
+
+func coordToGTP(x, y, boardSize int) string {
+	letters := "ABCDEFGHJKLMNOPQRST"
+	if x < 0 || x >= len(letters) {
+		return "pass"
+	}
+	gtpY := boardSize - y
+	return fmt.Sprintf("%c%d", letters[x], gtpY)
 }
 
 // 辅助函数：GTP坐标转x,y

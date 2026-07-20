@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../widgets/go_board.dart';
 import '../widgets/win_rate_bar.dart';
-import '../widgets/ai_suggestion.dart';
 import '../services/game_service.dart';
 import '../models/game_models.dart';
 import '../models/analysis_data.dart';
@@ -77,7 +76,6 @@ class _PlayPageState extends State<PlayPage> {
       final result = await api.playMove(_gameId, x, y, _playerColor);
       setState(() {
         _gameState = result['game'];
-        _analysis = result['analysis'];
       });
       await _runKataGoAnalysis();
       await Future.delayed(const Duration(milliseconds: 300));
@@ -105,7 +103,6 @@ class _PlayPageState extends State<PlayPage> {
       final result = await api.aiMove(_gameId, aiColor, difficulty: _difficulty);
       setState(() {
         _gameState = result['game'];
-        _analysis = result['analysis'];
       });
       await _runKataGoAnalysis();
     } catch (e) {
@@ -115,19 +112,40 @@ class _PlayPageState extends State<PlayPage> {
     }
   }
 
+  AnalysisResult _convertKataGoToAnalysis(AnalysisData data) {
+    return AnalysisResult(
+      winRate: data.winrate * 100,
+      scoreLead: data.scoreLead,
+      topMoves: data.candidateMoves.take(5).map((c) => TopMove(
+        move: c.move,
+        winRate: c.winrate * 100,
+        scoreLead: c.scoreLead,
+        visits: c.visits,
+        policy: 0.3,
+      )).toList(),
+      moveNumber: 0,
+    );
+  }
+
   Future<void> _runKataGoAnalysis() async {
     if (_gameState == null) return;
     setState(() => _isAnalyzing = true);
     try {
       final api = context.read<GameService>();
-      final analysis = await api.analyzeGame(
+      final analysisData = await api.analyzeGame(
         _gameState!.moves,
         _gameState!.boardSize,
         _gameState!.currentPlayer,
       );
-      setState(() => _katagoAnalysis = analysis);
+      setState(() {
+        _katagoAnalysis = analysisData;
+        _analysis = _convertKataGoToAnalysis(analysisData);
+      });
     } catch (e) {
-      setState(() => _katagoAnalysis = null);
+      setState(() {
+        _katagoAnalysis = null;
+        _analysis = null;
+      });
     } finally {
       if (mounted) setState(() => _isAnalyzing = false);
     }
@@ -326,21 +344,6 @@ class _PlayPageState extends State<PlayPage> {
           : _gameState == null
               ? const Center(child: Text('加载失败'))
               : _buildGameBody(),
-      floatingActionButton: _gameState != null
-          ? FloatingActionButton(
-              onPressed: _runKataGoAnalysis,
-              tooltip: 'AI分析',
-              backgroundColor: const Color(0xFF2D5016),
-              foregroundColor: Colors.white,
-              child: _isAnalyzing
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                    )
-                  : const Icon(Icons.analytics),
-            )
-          : null,
     );
   }
 
@@ -414,18 +417,9 @@ class _PlayPageState extends State<PlayPage> {
       );
     }
 
-    return Column(
-      children: [
-        WinRateBar(
-          winrate: _katagoAnalysis!.winrate,
-          currentColor: _gameState!.currentPlayer,
-        ),
-        const SizedBox(height: 8),
-        AISuggestion(
-          analysis: _katagoAnalysis!,
-          currentColor: _gameState!.currentPlayer,
-        ),
-      ],
+    return WinRateBar(
+      winrate: _katagoAnalysis!.winrate,
+      currentColor: _gameState!.currentPlayer,
     );
   }
 

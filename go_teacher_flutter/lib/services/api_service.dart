@@ -10,9 +10,9 @@ class ApiService implements GameService {
 
   // TODO: 联调时修改此地址为你的电脑IP，如 'http://192.168.1.105:8080'
   // 当前为 localhost，仅本地模拟器可用
-  ApiService({this.baseUrl = '192.168.80.240'}) : _client = http.Client();
+  ApiService({this.baseUrl = 'http://192.168.1.25:8080'}) : _client = http.Client();
 
-  factory ApiService.withClient(http.Client client, {String baseUrl = '192.168.80.240'}) {
+  factory ApiService.withClient(http.Client client, {String baseUrl = 'http://192.168.1.25:8080'}) {
     return ApiService._internal(baseUrl, client);
   }
 

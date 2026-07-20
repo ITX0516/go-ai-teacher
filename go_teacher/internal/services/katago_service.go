@@ -2,6 +2,7 @@ package services
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"fmt"
 	"go_teacher/internal/config"
@@ -10,274 +11,279 @@ import (
 	"math"
 	"math/rand"
 	"os/exec"
-	"strings"
-	"sync"
 	"time"
 )
 
-// KataGoService KataGo 引擎服务，封装 GTP 子进程通信
+type MoveRecord struct {
+	X     int    `json:"x"`
+	Y     int    `json:"y"`
+	Color int    `json:"color"`
+	Move  string `json:"move"`
+}
+
+type AnalysisResult struct {
+	Winrate        float64        `json:"winrate"`
+	BestMove       string         `json:"bestMove"`
+	ScoreLead      float64        `json:"scoreLead"`
+	CandidateMoves []CandidateMove `json:"candidateMoves"`
+}
+
+type CandidateMove struct {
+	Move     string  `json:"move"`
+	Winrate  float64 `json:"winrate"`
+	ScoreLead float64 `json:"scoreLead"`
+}
+
+type KataGoRequest struct {
+	ID            string       `json:"id"`
+	InitialStones [][]string   `json:"initialStones"`
+	Moves         [][]string   `json:"moves"`
+	Rules         string       `json:"rules"`
+	BoardXSize    int          `json:"boardXSize"`
+	BoardYSize    int          `json:"boardYSize"`
+	AnalyzeTurns  []int        `json:"analyzeTurns"`
+}
+
+type KataGoResponse struct {
+	ID      string             `json:"id"`
+	Results []AnalysisTurnResult `json:"results"`
+}
+
+type AnalysisTurnResult struct {
+	TurnIndex int             `json:"turnIndex"`
+	RootInfo  RootInfo        `json:"rootInfo"`
+	MoveInfos []MoveInfo      `json:"moveInfos"`
+}
+
+type RootInfo struct {
+	Winrate   float64 `json:"winrate"`
+	ScoreLead float64 `json:"scoreLead"`
+}
+
+type MoveInfo struct {
+	Move      string  `json:"move"`
+	Winrate   float64 `json:"winrate"`
+	ScoreLead float64 `json:"scoreLead"`
+}
+
 type KataGoService struct {
 	cfg     config.KataGoConfig
 	enabled bool
-
-	cmd    *exec.Cmd
-	stdin  *bufio.Writer
-	stdout *bufio.Reader
-	mu     sync.Mutex // 保护 stdin 写操作，防止并发混写
 }
 
-// NewKataGoService 启动 KataGo 子进程；启动失败时返回 enabled=false 的实例（降级为 mock）
 func NewKataGoService(cfg config.KataGoConfig) *KataGoService {
-	s := &KataGoService{cfg: cfg, enabled: true}
-
-	if err := s.startProcess(); err != nil {
-		log.Printf("[KataGo] 子进程启动失败，降级为 mock 模式: %v", err)
-		s.enabled = false
-		return s
+	return &KataGoService{
+		cfg:     cfg,
+		enabled: true,
 	}
-	log.Printf("[KataGo] 子进程启动成功: %s", cfg.ExecutablePath)
-	return s
 }
 
-// startProcess 启动 katago gtp 子进程
-func (s *KataGoService) startProcess() error {
-	args := []string{"gtp", "-config", s.cfg.ConfigPath, "-model", s.cfg.ModelPath}
-	s.cmd = exec.Command(s.cfg.ExecutablePath, args...)
+func (s *KataGoService) Analyze(moves []MoveRecord, boardSize int, color int) (*AnalysisResult, error) {
+	if !s.enabled {
+		return s.mockAnalysis(len(moves)), nil
+	}
 
-	stdinPipe, err := s.cmd.StdinPipe()
+	kataMoves := make([][]string, 0)
+	for _, m := range moves {
+		c := "B"
+		if m.Color == 2 {
+			c = "W"
+		}
+		kataMoves = append(kataMoves, []string{c, m.Move})
+	}
+
+	request := KataGoRequest{
+		ID:            "analyze-1",
+		InitialStones: [][]string{},
+		Moves:         kataMoves,
+		Rules:         "tromp-taylor",
+		BoardXSize:    boardSize,
+		BoardYSize:    boardSize,
+		AnalyzeTurns:  []int{len(moves)},
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, s.cfg.ExecutablePath,
+		"analysis",
+		"-model", s.cfg.ModelPath,
+		"-config", s.cfg.ConfigPath,
+		"-override-config", fmt.Sprintf("maxVisits=%d", s.cfg.MaxVisits),
+		"-override-config", fmt.Sprintf("numAnalysisThreads=%d", s.cfg.NumAnalysisThreads),
+		"-override-config", fmt.Sprintf("nnMaxBatchSize=%d", s.cfg.NNMaxBatchSize),
+	)
+
+	stdinPipe, err := cmd.StdinPipe()
 	if err != nil {
-		return fmt.Errorf("创建 stdin 管道失败: %w", err)
+		log.Printf("[KataGo] 创建 stdin 管道失败: %v", err)
+		return s.mockAnalysis(len(moves)), nil
 	}
-	stdoutPipe, err := s.cmd.StdoutPipe()
+
+	stdoutPipe, err := cmd.StdoutPipe()
 	if err != nil {
-		return fmt.Errorf("创建 stdout 管道失败: %w", err)
+		log.Printf("[KataGo] 创建 stdout 管道失败: %v", err)
+		return s.mockAnalysis(len(moves)), nil
 	}
 
-	if err := s.cmd.Start(); err != nil {
-		return fmt.Errorf("启动 katago 进程失败: %w", err)
+	if err := cmd.Start(); err != nil {
+		log.Printf("[KataGo] 启动子进程失败: %v", err)
+		return s.mockAnalysis(len(moves)), nil
 	}
 
-	s.stdin = bufio.NewWriter(stdinPipe)
-	s.stdout = bufio.NewReader(stdoutPipe)
+	encoder := json.NewEncoder(stdinPipe)
+	if err := encoder.Encode(request); err != nil {
+		log.Printf("[KataGo] 写入 JSON 请求失败: %v", err)
+		_ = cmd.Process.Kill()
+		return s.mockAnalysis(len(moves)), nil
+	}
 
-	// 探活：发一条 protocol_version，确认引擎响应
-	resp, err := s.sendCommand("protocol_version")
+	if err := stdinPipe.Close(); err != nil {
+		log.Printf("[KataGo] 关闭 stdin 失败: %v", err)
+	}
+
+	scanner := bufio.NewScanner(stdoutPipe)
+	var responseLine string
+	for scanner.Scan() {
+		responseLine = scanner.Text()
+		if responseLine != "" {
+			break
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		log.Printf("[KataGo] 读取响应失败: %v", err)
+		_ = cmd.Process.Kill()
+		return s.mockAnalysis(len(moves)), nil
+	}
+
+	if err := cmd.Wait(); err != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			log.Printf("[KataGo] 分析超时")
+			return s.mockAnalysis(len(moves)), nil
+		}
+		log.Printf("[KataGo] 子进程退出异常: %v", err)
+	}
+
+	if responseLine == "" {
+		log.Println("[KataGo] 响应为空")
+		return s.mockAnalysis(len(moves)), nil
+	}
+
+	var resp KataGoResponse
+	if err := json.Unmarshal([]byte(responseLine), &resp); err != nil {
+		log.Printf("[KataGo] 解析 JSON 响应失败: %v, response: %s", err, responseLine)
+		return s.mockAnalysis(len(moves)), nil
+	}
+
+	if len(resp.Results) == 0 {
+		log.Println("[KataGo] 无分析结果")
+		return s.mockAnalysis(len(moves)), nil
+	}
+
+	result := resp.Results[0]
+	candidates := make([]CandidateMove, 0)
+	for _, mi := range result.MoveInfos {
+		candidates = append(candidates, CandidateMove{
+			Move:     mi.Move,
+			Winrate:  mi.Winrate,
+			ScoreLead: mi.ScoreLead,
+		})
+	}
+
+	bestMove := ""
+	if len(result.MoveInfos) > 0 {
+		bestMove = result.MoveInfos[0].Move
+	}
+
+	return &AnalysisResult{
+		Winrate:        result.RootInfo.Winrate,
+		BestMove:       bestMove,
+		ScoreLead:      result.RootInfo.ScoreLead,
+		CandidateMoves: candidates,
+	}, nil
+}
+
+func (s *KataGoService) GenMove(moves []MoveRecord, boardSize int, color int) (string, error) {
+	result, err := s.Analyze(moves, boardSize, color)
 	if err != nil {
-		return fmt.Errorf("katago 探活失败: %w", err)
+		return "pass", err
 	}
-	log.Printf("[KataGo] 探活成功，protocol_version=%s", strings.TrimSpace(resp))
+	if result.BestMove == "" || result.BestMove == "pass" {
+		return "pass", nil
+	}
+	return result.BestMove, nil
+}
 
+func (s *KataGoService) Close() error {
 	return nil
 }
 
-// sendCommand 发送一条 GTP 命令并读取响应（读到空行为止）
-// 返回：响应正文（不含 "= " 前缀，不含结尾空行）
-func (s *KataGoService) sendCommand(cmd string) (string, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	if _, err := s.stdin.WriteString(cmd + "\n"); err != nil {
-		return "", fmt.Errorf("写入命令失败: %w", err)
-	}
-	if err := s.stdin.Flush(); err != nil {
-		return "", fmt.Errorf("flush 失败: %w", err)
+func (s *KataGoService) mockAnalysis(moveCount int) *AnalysisResult {
+	baseWinRate := 0.5
+	if moveCount > 0 {
+		baseWinRate = 0.5 + math.Sin(float64(moveCount)*0.3)*0.1
 	}
 
-	return s.readResponse()
-}
-
-// readResponse 读取 GTP 响应，直到遇到空行为止
-// GTP 响应格式：
-//   正常：= <content>\n\n
-//   错误：? <content>\n\n
-func (s *KataGoService) readResponse() (string, error) {
-	var lines []string
-	for {
-		line, err := s.stdout.ReadString('\n')
-		if err != nil {
-			return "", fmt.Errorf("读取响应失败: %w", err)
-		}
-		// 去掉行尾换行
-		line = strings.TrimRight(line, "\r\n")
-
-		// 空行表示响应结束
-		if line == "" {
-			if len(lines) == 0 {
-				continue
-			}
-			break
-		}
-
-		lines = append(lines, line)
-
-		// 错误响应
-		if strings.HasPrefix(line, "? ") {
-			// 继续读直到空行
-			for {
-				l, err := s.stdout.ReadString('\n')
-				if err != nil {
-					return "", fmt.Errorf("读取错误响应失败: %w", err)
-				}
-				if strings.TrimRight(l, "\r\n") == "" {
-					break
-				}
-			}
-			return "", fmt.Errorf("GTP 错误: %s", strings.TrimPrefix(line, "? "))
-		}
+	candidates := []CandidateMove{
+		{Move: "D17", Winrate: baseWinRate, ScoreLead: -0.08},
+		{Move: "R4", Winrate: baseWinRate - 0.005, ScoreLead: -0.1},
+		{Move: "Q16", Winrate: baseWinRate - 0.01, ScoreLead: -0.15},
+		{Move: "D4", Winrate: baseWinRate - 0.015, ScoreLead: -0.2},
 	}
 
-	if len(lines) == 0 {
-		return "", nil
-	}
-
-	// 第一行格式 "= xxx"，去掉 "= " 前缀
-	first := lines[0]
-	if strings.HasPrefix(first, "= ") {
-		lines[0] = strings.TrimPrefix(first, "= ")
-	} else if first == "=" {
-		lines[0] = ""
-	}
-
-	return strings.Join(lines, "\n"), nil
-}
-
-// Analyze 发送 kata-analyze 命令，解析多行 JSON
-// boardState: GTP play 命令序列，每行一条（如 "play b d4\nplay w q16"）
-// 返回胜率、最佳着法、目差
-func (s *KataGoService) Analyze(boardState string, color string) (winrate float64, bestMove string, scoreLead float64, err error) {
-	if !s.enabled {
-		// mock 降级
-		return 0.5, "D4", 0.0, nil
-	}
-
-	if _, err := s.sendCommand("clear_board"); err != nil {
-		return 0, "", 0, fmt.Errorf("清空棋盘失败: %w", err)
-	}
-
-	if boardState != "" {
-		moves := strings.Split(strings.TrimSpace(boardState), "\n")
-		for _, move := range moves {
-			move = strings.TrimSpace(move)
-			if move == "" {
-				continue
-			}
-			if _, err := s.sendCommand(move); err != nil {
-				return 0, "", 0, fmt.Errorf("恢复局面失败: %w", err)
-			}
-		}
-	}
-
-	// 发送 kata-analyze，限定 100 次访问以加速
-	cmd := fmt.Sprintf("kata-analyze %s 100", color)
-	resp, err := s.sendCommand(cmd)
-	if err != nil {
-		return 0, "", 0, fmt.Errorf("kata-analyze 失败: %w", err)
-	}
-
-	// kata-analyze 返回多行 JSON，每行格式：info move X winrate Y scoreLead Z ...
-	// 也可能包含多段（pv、ownership 等）
-	return parseKataAnalyze(resp)
-}
-
-// parseKataAnalyze 解析 kata-analyze 的输出
-// 示例输出：
-//   info move D4 visits 100 winrate 0.55 scoreLead 1.5 pv D4 Q16 D16
-//   info move Q16 visits 80 winrate 0.52 scoreLead 0.8 pv Q16 D4
-func parseKataAnalyze(resp string) (winrate float64, bestMove string, scoreLead float64, err error) {
-	lines := strings.Split(resp, "\n")
-	if len(lines) == 0 {
-		return 0, "", 0, fmt.Errorf("空响应")
-	}
-
-	// 取第一行（visits 最大的）作为最佳着法
-	first := lines[0]
-	parts := strings.Fields(first)
-	if len(parts) < 8 {
-		return 0, "", 0, fmt.Errorf("解析失败，字段不足: %s", first)
-	}
-
-	var wr float64 = 0.5
-	var sl float64 = 0
-	var mv string
-
-	for i := 0; i < len(parts)-1; i++ {
-		switch parts[i] {
-		case "move":
-			mv = parts[i+1]
-		case "winrate":
-			fmt.Sscanf(parts[i+1], "%f", &wr)
-			// KataGo 的 winrate 是 0~1，也可能是 0~100
-			if wr > 1.5 {
-				wr = wr / 100.0
-			}
-		case "scoreLead":
-			fmt.Sscanf(parts[i+1], "%f", &sl)
-		}
-	}
-
-	if mv == "" {
-		return 0, "", 0, fmt.Errorf("未找到 move 字段: %s", first)
-	}
-
-	return wr, mv, sl, nil
-}
-
-// GenMove 发送 genmove 命令
-func (s *KataGoService) GenMove(color string) (string, error) {
-	if !s.enabled {
-		return "pass", nil
-	}
-	resp, err := s.sendCommand("genmove " + color)
-	if err != nil {
-		return "", fmt.Errorf("genmove 失败: %w", err)
-	}
-	return strings.TrimSpace(resp), nil
-}
-
-// Close 发送 quit 并清理子进程资源
-func (s *KataGoService) Close() {
-	if !s.enabled || s.cmd == nil {
-		return
-	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	log.Println("[KataGo] 发送 quit 命令...")
-	_, _ = s.stdin.WriteString("quit\n")
-	_ = s.stdin.Flush()
-
-	done := make(chan error, 1)
-	go func() {
-		done <- s.cmd.Wait()
-	}()
-	select {
-	case err := <-done:
-		if err != nil {
-			log.Printf("[KataGo] 子进程退出: %v", err)
-		} else {
-			log.Println("[KataGo] 子进程正常退出")
-		}
-	case <-time.After(5 * time.Second):
-		log.Println("[KataGo] 子进程未及时退出，强制 kill")
-		_ = s.cmd.Process.Kill()
-		<-done
+	return &AnalysisResult{
+		Winrate:        baseWinRate,
+		BestMove:       candidates[0].Move,
+		ScoreLead:      candidates[0].ScoreLead,
+		CandidateMoves: candidates,
 	}
 }
 
-// ===== 兼容旧接口的方法（保留 mock 降级路径）=====
-
-// AnalyzePosition 分析当前局面（旧接口，给 PlayMove 等使用）
 func (s *KataGoService) AnalyzePosition(game *models.GameState) (*models.AnalysisResult, error) {
 	if !s.enabled {
-		return s.mockAnalysis(game), nil
+		return s.mockModelsAnalysis(game), nil
 	}
-	// 真实引擎路径：先把局面同步到 kata，再分析
-	// 这里简化：直接用 mock 的 TopMoves 列表，但把 WinRate 换成真实值
-	// 完整的 SGF 同步较复杂，保留接口给后续迭代
-	return s.mockAnalysis(game), nil
+
+	moves := make([]MoveRecord, 0)
+	for _, m := range game.Moves {
+		moves = append(moves, MoveRecord{
+			X:     m.X,
+			Y:     m.Y,
+			Color: int(m.Color),
+			Move:  m.Move,
+		})
+	}
+
+	color := 1
+	if game.Current == models.White {
+		color = 2
+	}
+
+	result, err := s.Analyze(moves, game.BoardSize, color)
+	if err != nil {
+		return s.mockModelsAnalysis(game), nil
+	}
+
+	topMoves := make([]models.TopMove, 0)
+	for _, cm := range result.CandidateMoves {
+		topMoves = append(topMoves, models.TopMove{
+			Move:      cm.Move,
+			WinRate:   cm.Winrate * 100,
+			ScoreLead: cm.ScoreLead,
+			Visits:    1000,
+			Policy:    0.3,
+		})
+	}
+
+	return &models.AnalysisResult{
+		WinRate:    result.Winrate * 100,
+		ScoreLead:  result.ScoreLead,
+		TopMoves:   topMoves,
+		MoveNumber: len(game.Moves),
+	}, nil
 }
 
-// GetBestMove 返回最佳着法（旧接口）
 func (s *KataGoService) GetBestMove(game *models.GameState, difficulty string) (string, error) {
 	analysis, err := s.AnalyzePosition(game)
 	if err != nil {
@@ -323,7 +329,7 @@ func (s *KataGoService) pickMediumMove(analysis *models.AnalysisResult) string {
 	return analysis.TopMoves[idx].Move
 }
 
-func (s *KataGoService) mockAnalysis(game *models.GameState) *models.AnalysisResult {
+func (s *KataGoService) mockModelsAnalysis(game *models.GameState) *models.AnalysisResult {
 	moveNum := len(game.Moves)
 	baseWinRate := 50.0
 	if moveNum > 0 {
@@ -378,7 +384,6 @@ func generateCandidateMoves(game *models.GameState) []string {
 	return result
 }
 
-// MoveToCoord 将 GTP 坐标转换为数组下标
 func MoveToCoord(move string, boardSize int) (int, int, error) {
 	if move == "pass" || move == "tt" {
 		return -1, -1, nil
@@ -401,7 +406,6 @@ func MoveToCoord(move string, boardSize int) (int, int, error) {
 	return x, y, nil
 }
 
-// AnalysisToJSON 序列化分析结果
 func AnalysisToJSON(a *models.AnalysisResult) []byte {
 	b, _ := json.Marshal(a)
 	return b

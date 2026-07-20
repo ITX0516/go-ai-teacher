@@ -165,6 +165,46 @@ class _PlayPageState extends State<PlayPage> {
     }
   }
 
+  Future<void> _passMove() async {
+    if (_gameState == null || _isAiThinking) return;
+    if (_gameState!.currentPlayer != _playerColor) return;
+    if (_gameState!.result != null) return;
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('确认停一手'),
+        content: const Text('确定要停一手（虚着）吗？'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('取消'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('停一手'),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+    setState(() => _isLoading = true);
+    try {
+      final api = context.read<GameService>();
+      final result = await api.playMove(_gameId, -1, -1, _playerColor);
+      setState(() {
+        _gameState = result['game'];
+      });
+      if (_gameState!.currentPlayer != _playerColor && _gameState!.result == null) {
+        await Future.delayed(const Duration(milliseconds: 300));
+        await _makeAiMove();
+      }
+    } catch (e) {
+      _showError(e.toString());
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
   Future<void> _resign() async {
     if (_gameState == null || _gameState!.result != null) return;
     final confirm = await showDialog<bool>(
@@ -726,7 +766,16 @@ class _PlayPageState extends State<PlayPage> {
                 color: const Color(0xFF718096),
               ),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 6),
+            Expanded(
+              child: _controlButton(
+                icon: Icons.pause_circle_outline,
+                label: '停一手',
+                onTap: _passMove,
+                color: const Color(0xFF8E44AD),
+              ),
+            ),
+            const SizedBox(width: 6),
             Expanded(
               child: _controlButton(
                 icon: Icons.lightbulb,
@@ -735,7 +784,7 @@ class _PlayPageState extends State<PlayPage> {
                 color: const Color(0xFFE67E22),
               ),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 6),
             Expanded(
               child: _controlButton(
                 icon: Icons.analytics,
@@ -744,7 +793,7 @@ class _PlayPageState extends State<PlayPage> {
                 color: const Color(0xFF1E3A5F),
               ),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 6),
             Expanded(
               child: _controlButton(
                 icon: Icons.flag,

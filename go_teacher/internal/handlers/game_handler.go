@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"go_teacher/internal/models"
 	"go_teacher/internal/services"
+	"log"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 )
@@ -107,29 +109,63 @@ func (h *GameHandler) AIMove(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "game not found"})
 		return
 	}
-	move, err := h.kataGoService.GenMove(gameMovesToInputs(game), game.BoardSize, req.Color)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	x, y, err := gtpToCoord(move, game.BoardSize)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
 	stoneColor := models.Black
 	if req.Color == 2 {
 		stoneColor = models.White
 	}
-	updatedGame, err := h.gameService.PlayMove(gameID, x, y, stoneColor)
+
+	analysis, err := h.kataGoService.Analyze(gameMovesToInputs(game), game.BoardSize, req.Color)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		log.Printf("[AI] 分析失败: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+
+	log.Printf("[AI] 候选着法数量: %d, 最佳: %s", len(analysis.CandidateMoves), analysis.BestMove)
+
+	var finalMove string
+	var finalX, finalY int
+	played := false
+
+	for i, cm := range analysis.CandidateMoves {
+		if cm.Move == "pass" || cm.Move == "" {
+			continue
+		}
+		x, y, coordErr := gtpToCoord(cm.Move, game.BoardSize)
+		if coordErr != nil {
+			log.Printf("[AI] 候选点 %d 坐标解析失败 %s: %v", i, cm.Move, coordErr)
+			continue
+		}
+		_, playErr := h.gameService.PlayMove(gameID, x, y, stoneColor)
+		if playErr != nil {
+			log.Printf("[AI] 候选点 %d %s 落子失败: %v", i, cm.Move, playErr)
+			continue
+		}
+		finalMove = cm.Move
+		finalX = x
+		finalY = y
+		played = true
+		log.Printf("[AI] 使用候选点 %d: %s", i, cm.Move)
+		break
+	}
+
+	if !played {
+		log.Printf("[AI] 所有候选点都失败，执行 pass")
+		_, playErr := h.gameService.PlayMove(gameID, -1, -1, stoneColor)
+		if playErr != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": playErr.Error()})
+			return
+		}
+		finalMove = "pass"
+		finalX = -1
+		finalY = -1
+	}
+
+	updatedGame, _ := h.gameService.GetGame(gameID)
 	c.JSON(http.StatusOK, gin.H{
-		"move": move,
-		"x":    x,
-		"y":    y,
+		"move": finalMove,
+		"x":    finalX,
+		"y":    finalY,
 		"game": services.GameStateToJSON(updatedGame),
 	})
 }
@@ -326,8 +362,9 @@ func gtpToCoord(move string, boardSize int) (int, int, error) {
 	}
 	letters := "ABCDEFGHJKLMNOPQRST"
 	x := -1
+	first := strings.ToUpper(string(move[0]))[0]
 	for i, c := range letters {
-		if c == rune(move[0]) {
+		if c == rune(first) {
 			x = i
 			break
 		}

@@ -39,6 +39,16 @@ func NewGame(size int, komi float64) *GameState {
 }
 
 func (g *GameState) PlayMove(x, y int, color Stone) bool {
+	if x == -1 && y == -1 {
+		g.Moves = append(g.Moves, Move{
+			X:     -1,
+			Y:     -1,
+			Color: color,
+			Move:  "pass",
+		})
+		g.Current = 3 - color
+		return true
+	}
 	if x < 0 || x >= g.BoardSize || y < 0 || y >= g.BoardSize {
 		return false
 	}

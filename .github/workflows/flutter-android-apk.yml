@@ -8,6 +8,7 @@ on:
       - master
     paths:
       - "go_teacher_flutter/**"
+      - "go_teacher/**"
       - ".github/workflows/flutter-android-apk.yml"
 
 jobs:

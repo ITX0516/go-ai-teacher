@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../widgets/go_board.dart';
+import '../widgets/win_rate_bar.dart';
+import '../widgets/ai_suggestion.dart';
 import '../services/game_service.dart';
 import '../models/game_models.dart';
+import '../models/analysis_data.dart';
 
 class PlayPage extends StatefulWidget {
   const PlayPage({super.key});
@@ -15,8 +18,10 @@ class _PlayPageState extends State<PlayPage> {
   final String _gameId = 'game_${DateTime.now().millisecondsSinceEpoch}';
   GameState? _gameState;
   AnalysisResult? _analysis;
+  AnalysisData? _katagoAnalysis;
   bool _isLoading = false;
   bool _isAiThinking = false;
+  bool _isAnalyzing = false;
   String _difficulty = 'medium';
   int _playerColor = 1;
   bool _showHints = false;
@@ -74,6 +79,7 @@ class _PlayPageState extends State<PlayPage> {
         _gameState = result['game'];
         _analysis = result['analysis'];
       });
+      await _runKataGoAnalysis();
       await Future.delayed(const Duration(milliseconds: 300));
       await _makeAiMove();
     } catch (e) {
@@ -101,10 +107,29 @@ class _PlayPageState extends State<PlayPage> {
         _gameState = result['game'];
         _analysis = result['analysis'];
       });
+      await _runKataGoAnalysis();
     } catch (e) {
       _showError(e.toString());
     } finally {
       setState(() => _isAiThinking = false);
+    }
+  }
+
+  Future<void> _runKataGoAnalysis() async {
+    if (_gameState == null) return;
+    setState(() => _isAnalyzing = true);
+    try {
+      final api = context.read<GameService>();
+      final analysis = await api.analyzeGame(
+        _gameState!.moves,
+        _gameState!.boardSize,
+        _gameState!.currentPlayer,
+      );
+      setState(() => _katagoAnalysis = analysis);
+    } catch (e) {
+      setState(() => _katagoAnalysis = null);
+    } finally {
+      if (mounted) setState(() => _isAnalyzing = false);
     }
   }
 
@@ -301,6 +326,21 @@ class _PlayPageState extends State<PlayPage> {
           : _gameState == null
               ? const Center(child: Text('加载失败'))
               : _buildGameBody(),
+      floatingActionButton: _gameState != null
+          ? FloatingActionButton(
+              onPressed: _runKataGoAnalysis,
+              tooltip: 'AI分析',
+              backgroundColor: const Color(0xFF2D5016),
+              foregroundColor: Colors.white,
+              child: _isAnalyzing
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : const Icon(Icons.analytics),
+            )
+          : null,
     );
   }
 
@@ -312,6 +352,8 @@ class _PlayPageState extends State<PlayPage> {
       child: Column(
         children: [
           _buildPlayerInfo(),
+          const SizedBox(height: 12),
+          _buildAnalysisSection(),
           const SizedBox(height: 12),
           GoBoard(
             boardSize: _gameState!.boardSize,
@@ -340,6 +382,50 @@ class _PlayPageState extends State<PlayPage> {
           _buildControls(),
         ],
       ),
+    );
+  }
+
+  Widget _buildAnalysisSection() {
+    if (_isAnalyzing) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: 16),
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    if (_katagoAnalysis == null) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Center(
+          child: Text(
+            'AI分析暂不可用',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey[500],
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Column(
+      children: [
+        WinRateBar(
+          winrate: _katagoAnalysis!.winrate,
+          currentColor: _gameState!.currentPlayer,
+        ),
+        const SizedBox(height: 8),
+        AISuggestion(
+          analysis: _katagoAnalysis!,
+          currentColor: _gameState!.currentPlayer,
+        ),
+      ],
     );
   }
 

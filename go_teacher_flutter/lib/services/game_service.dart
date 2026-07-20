@@ -1,4 +1,5 @@
 import '../models/game_models.dart';
+import '../models/analysis_data.dart';
 
 abstract class GameService {
   Future<GameState> newGame(String gameId, {int boardSize = 19, double komi = 6.5});
@@ -14,4 +15,5 @@ abstract class GameService {
   Future<Puzzle> getPuzzle(String id);
   Future<Map<String, dynamic>> checkPuzzleAnswer(String id, String move);
   Future<String> gameSummary(String sgf, String result);
+  Future<AnalysisData> analyzeGame(List<MoveRecord> moves, int boardSize, int color);
 }

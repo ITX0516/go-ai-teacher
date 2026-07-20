@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/game_models.dart';
+import '../models/analysis_data.dart';
 import 'game_service.dart';
 
 class ApiService implements GameService {
@@ -165,5 +166,21 @@ class ApiService implements GameService {
       return data['summary'] ?? '';
     }
     throw Exception('Failed to get summary');
+  }
+
+  Future<AnalysisData> analyzeGame(List<MoveRecord> moves, int boardSize, int color) async {
+    final response = await _client.post(
+      Uri.parse('$baseUrl/api/game/analyze'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'moves': moves.map((m) => m.toJson()).toList(),
+        'board_size': boardSize,
+        'color': color,
+      }),
+    );
+    if (response.statusCode == 200) {
+      return AnalysisData.fromJson(jsonDecode(response.body));
+    }
+    throw Exception('Failed to analyze game');
   }
 }

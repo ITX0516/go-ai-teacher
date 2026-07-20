@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import '../models/game_models.dart';
+import '../models/analysis_data.dart';
 import 'go_engine.dart';
 import 'game_service.dart';
 import 'deepseek_service.dart';
@@ -255,6 +256,31 @@ class MockApiService implements GameService {
 建议你重点加强中盘战斗力和形势判断能力。可以多做一些中盘战的题目，同时在实战中养成每步棋都思考"对方最好的应手是什么"的习惯。
 
 继续努力，棋力一定会更上一层楼！ 🔥''';
+  }
+
+  Future<AnalysisData> analyzeGame(List<MoveRecord> moves, int boardSize, int color) async {
+    await Future.delayed(const Duration(milliseconds: 300));
+
+    final winrate = 0.45 + _rand.nextDouble() * 0.15;
+    final bestMoves = ['D17', 'R4', 'D4', 'R17', 'K10'];
+    final bestMove = bestMoves[_rand.nextInt(bestMoves.length)];
+
+    final candidateMoves = <CandidateMove>[];
+    for (int i = 0; i < 5; i++) {
+      candidateMoves.add(CandidateMove(
+        move: bestMoves[i],
+        winrate: winrate + (5 - i) * 0.015 - _rand.nextDouble() * 0.01,
+        scoreLead: (winrate - 0.5) * 20 + _rand.nextDouble() * 5 - 2.5,
+        visits: 100 - i * 15 + _rand.nextInt(20),
+      ));
+    }
+
+    return AnalysisData(
+      winrate: winrate,
+      bestMove: bestMove,
+      scoreLead: (winrate - 0.5) * 20,
+      candidateMoves: candidateMoves,
+    );
   }
 
   AnalysisResult _generateAnalysis(GoEngine engine) {

@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"strings"
 	"sync"
+	"time"
 )
 
 // KataGoService KataGo 引擎服务，封装 GTP 子进程通信
@@ -141,8 +142,7 @@ func (s *KataGoService) readResponse() (string, error) {
 }
 
 // Analyze 发送 kata-analyze 命令，解析多行 JSON
-// boardState: SGF 或 GTP 坐标序列（由调用方决定如何下发）
-// 为简化接入，这里直接接收已构造好的 GTP 命令参数（如 "b" / "w"）
+// boardState: GTP play 命令序列，每行一条（如 "play b d4\nplay w q16"）
 // 返回胜率、最佳着法、目差
 func (s *KataGoService) Analyze(boardState string, color string) (winrate float64, bestMove string, scoreLead float64, err error) {
 	if !s.enabled {
@@ -150,13 +150,20 @@ func (s *KataGoService) Analyze(boardState string, color string) (winrate float6
 		return 0.5, "D4", 0.0, nil
 	}
 
-	// 先恢复局面到 boardState，再分析
-	// 注意：这里假设调用方传入的 boardState 是一个完整的 GTP play 序列
-	// 例如 "play b d4\nplay w q16\n..."
-	// 我们逐条下发，再发 kata-analyze
+	if _, err := s.sendCommand("clear_board"); err != nil {
+		return 0, "", 0, fmt.Errorf("清空棋盘失败: %w", err)
+	}
+
 	if boardState != "" {
-		if _, err := s.sendCommand(boardState); err != nil {
-			return 0, "", 0, fmt.Errorf("恢复局面失败: %w", err)
+		moves := strings.Split(strings.TrimSpace(boardState), "\n")
+		for _, move := range moves {
+			move = strings.TrimSpace(move)
+			if move == "" {
+				continue
+			}
+			if _, err := s.sendCommand(move); err != nil {
+				return 0, "", 0, fmt.Errorf("恢复局面失败: %w", err)
+			}
 		}
 	}
 
@@ -250,7 +257,7 @@ func (s *KataGoService) Close() {
 		} else {
 			log.Println("[KataGo] 子进程正常退出")
 		}
-	default:
+	case <-time.After(5 * time.Second):
 		log.Println("[KataGo] 子进程未及时退出，强制 kill")
 		_ = s.cmd.Process.Kill()
 		<-done

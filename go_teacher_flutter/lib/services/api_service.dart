@@ -8,6 +8,8 @@ class ApiService implements GameService {
   final String baseUrl;
   final http.Client _client;
 
+  // TODO: 联调时修改此地址为你的电脑IP，如 'http://192.168.1.105:8080'
+  // 当前为 localhost，仅本地模拟器可用
   ApiService({this.baseUrl = 'http://localhost:8080'}) : _client = http.Client();
 
   factory ApiService.withClient(http.Client client, {String baseUrl = 'http://localhost:8080'}) {

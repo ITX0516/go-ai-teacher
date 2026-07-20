@@ -49,7 +49,7 @@ class ApiService implements GameService {
       final data = jsonDecode(response.body);
       return {
         'game': GameState.fromJson(data['game']),
-        'analysis': AnalysisResult.fromJson(data['analysis']),
+        'analysis': data['analysis'] != null ? AnalysisResult.fromJson(data['analysis']) : null,
       };
     }
     throw Exception('Failed to play move: ${response.body}');
@@ -68,7 +68,7 @@ class ApiService implements GameService {
         'x': data['x'],
         'y': data['y'],
         'game': GameState.fromJson(data['game']),
-        'analysis': AnalysisResult.fromJson(data['analysis']),
+        'analysis': data['analysis'] != null ? AnalysisResult.fromJson(data['analysis']) : null,
       };
     }
     throw Exception('Failed to get AI move: ${response.body}');

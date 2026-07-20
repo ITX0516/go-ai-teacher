@@ -85,6 +85,11 @@ class ApiService implements GameService {
     throw Exception('Failed to undo move');
   }
 
+  Future<GameState> resign(String gameId, int color) async {
+    // 后端暂未提供 resign 接口，返回当前游戏状态
+    return getGame(gameId);
+  }
+
   Future<AnalysisResult> analyze(String gameId) async {
     final response = await _client.get(Uri.parse('$baseUrl/api/games/$gameId/analyze'));
     if (response.statusCode == 200) {

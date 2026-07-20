@@ -5,46 +5,50 @@ import (
 	"strconv"
 )
 
-// KataGoConfig KataGo 引擎配置
-type KataGoConfig struct {
-	ExecutablePath      string // 可执行文件路径
-	ModelPath           string // 权重文件路径
-	ConfigPath          string // GTP 配置文件路径
-	MaxVisits           int    // 最大访问次数
-	NumAnalysisThreads  int    // 分析线程数
-	NNMaxBatchSize      int    // 神经网络批处理大小
-}
-
 type Config struct {
-	Port            int
-	KataGo          KataGoConfig
-	DeepSeekAPIKey  string
-	DeepSeekAPIURL  string
+	Port           int
+	DeepSeekAPIKey string
+	DeepSeekAPIURL string
+	KataGo         KataGoConfig
 }
 
-func Load() *Config {
-	port, _ := strconv.Atoi(getEnv("PORT", "8080"))
-	maxVisits, _ := strconv.Atoi(getEnv("KATAGO_MAX_VISITS", "20"))
-	numThreads, _ := strconv.Atoi(getEnv("KATAGO_THREADS", "2"))
-	batchSize, _ := strconv.Atoi(getEnv("KATAGO_BATCH_SIZE", "2"))
-	return &Config{
-		Port: port,
+type KataGoConfig struct {
+	ExecutablePath     string
+	ModelPath          string
+	ConfigPath         string
+	MaxVisits          int
+	NumAnalysisThreads int
+	NNMaxBatchSize     int
+}
+
+func Load() Config {
+	return Config{
+		Port:           getEnvInt("PORT", 8080),
+		DeepSeekAPIKey: os.Getenv("DEEPSEEK_API_KEY"),
+		DeepSeekAPIURL: getEnvDefault("DEEPSEEK_API_URL", "https://api.deepseek.com/v1/chat/completions"),
 		KataGo: KataGoConfig{
-			ExecutablePath:      getEnv("KATAGO_EXE", "C:\\Katago\\katago.exe"),
-			ModelPath:           getEnv("KATAGO_MODEL", "C:\\Katago\\networks\\kata1-b6c96-s175395328-d26788732.txt.gz"),
-			ConfigPath:          getEnv("KATAGO_CONFIG", "C:\\Katago\\default_gtp.cfg"),
-			MaxVisits:           maxVisits,
-			NumAnalysisThreads:  numThreads,
-			NNMaxBatchSize:      batchSize,
+			ExecutablePath:     getEnvDefault("KATAGO_EXE", "C:\\Katago\\katago.exe"),
+			ModelPath:          getEnvDefault("KATAGO_MODEL", "C:\\Katago\\networks\\kata1-b6c96-s175395328-d26788732.txt.gz"),
+			ConfigPath:         getEnvDefault("KATAGO_CONFIG", "C:\\Katago\\default_gtp.cfg"),
+			MaxVisits:          getEnvInt("KATAGO_MAX_VISITS", 20),
+			NumAnalysisThreads: getEnvInt("KATAGO_NUM_THREADS", 2),
+			NNMaxBatchSize:     getEnvInt("KATAGO_BATCH_SIZE", 2),
 		},
-		DeepSeekAPIKey: getEnv("DEEPSEEK_API_KEY", ""),
-		DeepSeekAPIURL: getEnv("DEEPSEEK_API_URL", "https://api.deepseek.com/chat/completions"),
 	}
 }
 
-func getEnv(key, def string) string {
+func getEnvDefault(key, defaultVal string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
 	}
-	return def
+	return defaultVal
+}
+
+func getEnvInt(key string, defaultVal int) int {
+	if v := os.Getenv(key); v != "" {
+		if i, err := strconv.Atoi(v); err == nil {
+			return i
+		}
+	}
+	return defaultVal
 }

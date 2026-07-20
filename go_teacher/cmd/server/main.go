@@ -6,6 +6,9 @@ import (
 	"go_teacher/internal/handlers"
 	"go_teacher/internal/services"
 	"log"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -18,7 +21,8 @@ func main() {
 	cfg := config.Load()
 
 	gameService := services.NewGameService()
-	kataGoService := services.NewKataGoService(false)
+	kataGoService := services.NewKataGoService(cfg.KataGo)
+	defer kataGoService.Close()
 	deepseekService := services.NewDeepSeekService(cfg.DeepSeekAPIKey, cfg.DeepSeekAPIURL)
 	puzzleService := services.NewPuzzleService()
 	userService := services.NewUserService()
@@ -30,9 +34,9 @@ func main() {
 	r := gin.Default()
 
 	r.Use(cors.New(cors.Config{
-		AllowAllOrigins: true,
-		AllowMethods:    []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowHeaders:    []string{"Origin", "Content-Type", "Accept", "Authorization"},
+		AllowAllOrigins:  true,
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
 		AllowCredentials: true,
 	}))
 
@@ -50,6 +54,13 @@ func main() {
 			games.POST("/:id/explain", gameHandler.ExplainMove)
 			games.POST("/:id/ask", gameHandler.AskQuestion)
 			games.POST("/summary", gameHandler.GameSummary)
+		}
+
+		// KataGo 直连接口
+		game := api.Group("/game")
+		{
+			game.POST("/analyze", gameHandler.AnalyzeSGF)
+			game.POST("/ai-move", gameHandler.AIGenMove)
 		}
 
 		puzzles := api.Group("/puzzles")
@@ -77,6 +88,15 @@ func main() {
 			})
 		})
 	}
+
+	// 优雅退出：捕获 SIGINT/SIGTERM，让 defer kataGoService.Close() 生效
+	go func() {
+		sigCh := make(chan os.Signal, 1)
+		signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+		<-sigCh
+		log.Println("收到退出信号，正在关闭服务...")
+		os.Exit(0)
+	}()
 
 	log.Printf("Server starting on port %d...", cfg.Port)
 	if err := r.Run(fmt.Sprintf(":%d", cfg.Port)); err != nil {

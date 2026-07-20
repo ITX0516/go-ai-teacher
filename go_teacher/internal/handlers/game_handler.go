@@ -4,6 +4,7 @@ import (
 	"go_teacher/internal/models"
 	"go_teacher/internal/services"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 )
@@ -230,4 +231,92 @@ func (h *GameHandler) GameSummary(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"summary": summary})
+}
+
+// ===== 新增 KataGo 直连接口 =====
+
+// analyzeRequest KataGo 分析请求
+type analyzeRequest struct {
+	BoardState string `json:"board_state"` // SGF 棋谱或 GTP play 序列
+	Color      string `json:"color"`       // "B" / "W"
+}
+
+// AnalyzeSGF 对指定局面做 KataGo 分析
+// POST /api/game/analyze
+func (h *GameHandler) AnalyzeSGF(c *gin.Context) {
+	var req analyzeRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if req.Color == "" {
+		req.Color = "B"
+	}
+	color := strings.ToLower(req.Color)
+
+	winrate, bestMove, scoreLead, err := h.kataGoService.Analyze(req.BoardState, color)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"winrate":   winrate,
+		"bestMove":  bestMove,
+		"scoreLead": scoreLead,
+	})
+}
+
+// aiMoveBySGFRequest 基于 SGF 局面让 KataGo 生成一手棋
+type aiMoveBySGFRequest struct {
+	GameID string `json:"game_id"`
+	Color  string `json:"color"` // "B" / "W"
+}
+
+// AIGenMove KataGo 生成着法
+// POST /api/game/ai-move
+func (h *GameHandler) AIGenMove(c *gin.Context) {
+	var req aiMoveBySGFRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if req.Color == "" {
+		req.Color = "W"
+	}
+	color := strings.ToLower(req.Color)
+
+	// 如果有 game_id，先从 GameService 拿当前局面同步给 KataGo
+	boardState := ""
+	if req.GameID != "" {
+		if game, ok := h.gameService.GetGame(req.GameID); ok {
+			boardState = h.gameService.GameToSGF(game)
+		}
+	}
+
+	// 先同步局面（内部会处理空字符串）
+	if _, _, _, err := h.kataGoService.Analyze(boardState, color); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "同步局面失败: " + err.Error()})
+		return
+	}
+
+	move, err := h.kataGoService.GenMove(color)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	// 转换为坐标
+	boardSize := 19
+	if req.GameID != "" {
+		if game, ok := h.gameService.GetGame(req.GameID); ok {
+			boardSize = game.BoardSize
+		}
+	}
+	x, y, _ := services.MoveToCoord(move, boardSize)
+
+	c.JSON(http.StatusOK, gin.H{
+		"move": move,
+		"x":    x,
+		"y":    y,
+	})
 }

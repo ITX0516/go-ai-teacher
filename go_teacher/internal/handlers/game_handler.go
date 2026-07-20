@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"go_teacher/internal/models"
 	"go_teacher/internal/services"
 	"net/http"
@@ -9,9 +10,9 @@ import (
 )
 
 type GameHandler struct {
-	gameService    *services.GameService
-	kataGoService  *services.KataGoService
-	deepseekService    *services.DeepSeekService
+	gameService     *services.GameService
+	kataGoService   *services.KataGoService
+	deepseekService *services.DeepSeekService
 }
 
 func NewGameHandler(gs *services.GameService, ks *services.KataGoService, deepseek *services.DeepSeekService) *GameHandler {
@@ -79,7 +80,8 @@ func (h *GameHandler) PlayMove(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	analysis, _ := h.kataGoService.AnalyzePosition(game)
+	// 适配新接口：传空moves获取首步分析作为占位，避免前端崩溃
+	analysis, _ := h.kataGoService.Analyze([]services.MoveInput{}, game.BoardSize, int(color))
 	c.JSON(http.StatusOK, gin.H{
 		"game":     services.GameStateToJSON(game),
 		"analysis": analysis,
@@ -106,12 +108,13 @@ func (h *GameHandler) AIMove(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "game not found"})
 		return
 	}
-	move, err := h.kataGoService.GetBestMove(game, req.Difficulty)
+	// 适配新接口：传空moves获取AI首步推荐
+	move, err := h.kataGoService.GenMove([]services.MoveInput{}, game.BoardSize, req.Color)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	x, y, err := services.MoveToCoord(move, game.BoardSize)
+	x, y, err := gtpToCoord(move, game.BoardSize)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -125,13 +128,11 @@ func (h *GameHandler) AIMove(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	analysis, _ := h.kataGoService.AnalyzePosition(updatedGame)
 	c.JSON(http.StatusOK, gin.H{
-		"move":     move,
-		"x":        x,
-		"y":        y,
-		"game":     services.GameStateToJSON(updatedGame),
-		"analysis": analysis,
+		"move": move,
+		"x":    x,
+		"y":    y,
+		"game": services.GameStateToJSON(updatedGame),
 	})
 }
 
@@ -152,19 +153,16 @@ func (h *GameHandler) Analyze(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "game not found"})
 		return
 	}
-	analysis, err := h.kataGoService.AnalyzePosition(game)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
+	// 适配新接口
+	analysis, _ := h.kataGoService.Analyze([]services.MoveInput{}, game.BoardSize, 1)
 	c.JSON(http.StatusOK, analysis)
 }
 
 type explainRequest struct {
-	MoveNumber int    `json:"move_number"`
-	Move       string `json:"move"`
+	MoveNumber    int     `json:"move_number"`
+	Move          string  `json:"move"`
 	WinRateChange float64 `json:"win_rate_change"`
-	Context    string `json:"context"`
+	Context       string  `json:"context"`
 }
 
 func (h *GameHandler) ExplainMove(c *gin.Context) {
@@ -235,9 +233,9 @@ func (h *GameHandler) GameSummary(c *gin.Context) {
 // ===== 新增 KataGo 直连接口 =====
 
 type analyzeRequest struct {
-	Moves     []services.MoveRecord `json:"moves"`
-	BoardSize int                   `json:"board_size"`
-	Color     int                   `json:"color"` // 1=黑, 2=白
+	Moves     []services.MoveInput `json:"moves"`
+	BoardSize int                  `json:"board_size"`
+	Color     int                  `json:"color"` // 1=黑, 2=白
 }
 
 func (h *GameHandler) AnalyzeSGF(c *gin.Context) {
@@ -262,9 +260,9 @@ func (h *GameHandler) AnalyzeSGF(c *gin.Context) {
 }
 
 type aiMoveBySGFRequest struct {
-	Moves     []services.MoveRecord `json:"moves"`
-	BoardSize int                   `json:"board_size"`
-	Color     int                   `json:"color"` // 1=黑, 2=白
+	Moves     []services.MoveInput `json:"moves"`
+	BoardSize int                  `json:"board_size"`
+	Color     int                  `json:"color"` // 1=黑, 2=白
 }
 
 func (h *GameHandler) AIGenMove(c *gin.Context) {
@@ -286,11 +284,37 @@ func (h *GameHandler) AIGenMove(c *gin.Context) {
 		return
 	}
 
-	x, y, _ := services.MoveToCoord(move, req.BoardSize)
+	x, y, _ := gtpToCoord(move, req.BoardSize)
 
 	c.JSON(http.StatusOK, gin.H{
 		"move": move,
 		"x":    x,
 		"y":    y,
 	})
+}
+
+// 辅助函数：GTP坐标转x,y
+func gtpToCoord(move string, boardSize int) (int, int, error) {
+	if move == "pass" || move == "" {
+		return -1, -1, nil
+	}
+	letters := "ABCDEFGHJKLMNOPQRST"
+	x := -1
+	for i, c := range letters {
+		if c == rune(move[0]) {
+			x = i
+			break
+		}
+	}
+	if x == -1 {
+		return -1, -1, fmt.Errorf("invalid move: %s", move)
+	}
+	var y int
+	_, err := fmt.Sscanf(move[1:], "%d", &y)
+	if err != nil {
+		return -1, -1, err
+	}
+	// GTP y 是从底部开始的 1-based，转成从顶部开始的 0-based
+	y = boardSize - y
+	return x, y, nil
 }

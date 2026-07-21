@@ -97,8 +97,46 @@ class MockApiService implements GameService {
     await Future.delayed(const Duration(milliseconds: 50));
     final engine = _games[gameId];
     if (engine == null) throw Exception('Game not found');
-    engine.resign(color);
+    engine.resignAction(color);
     return engine.toGameState();
+  }
+
+  Future<Map<String, dynamic>> pass(String gameId, int color) async {
+    await Future.delayed(const Duration(milliseconds: 80));
+    final engine = _games[gameId];
+    if (engine == null) throw Exception('Game not found');
+    engine.pass();
+    final gameState = engine.toGameState();
+    final shouldEndGame = engine.consecutivePasses >= 2;
+    return {
+      'game': gameState,
+      'shouldEndGame': shouldEndGame,
+    };
+  }
+
+  Future<bool> hasLegalMoves(String gameId, int color) async {
+    await Future.delayed(const Duration(milliseconds: 50));
+    final engine = _games[gameId];
+    if (engine == null) throw Exception('Game not found');
+    return engine.hasLegalMoves(color);
+  }
+
+  Future<Map<String, dynamic>> getScoringData(String gameId) async {
+    await Future.delayed(const Duration(milliseconds: 100));
+    final engine = _games[gameId];
+    if (engine == null) throw Exception('Game not found');
+    return {
+      'board': engine.board,
+      'territoryMap': engine.getTerritoryMap(),
+      'boardSize': engine.boardSize,
+    };
+  }
+
+  Future<ScoringResult> confirmDeadStones(String gameId, List<(int, int)> deadStones) async {
+    await Future.delayed(const Duration(milliseconds: 200));
+    final engine = _games[gameId];
+    if (engine == null) throw Exception('Game not found');
+    return engine.calculateScore(deadStones);
   }
 
   Future<AnalysisResult> analyze(String gameId) async {

@@ -4,6 +4,43 @@ class GoStone {
   static const int white = 2;
 }
 
+/// 终局方式
+enum EndGameType {
+  /// 主动认输
+  resign,
+  /// 申请数棋
+  scoring,
+  /// 无棋可下自动终局
+  noMoves,
+}
+
+/// 数棋结果
+class ScoringResult {
+  final int blackStones;
+  final int whiteStones;
+  final int blackTerritory;
+  final int whiteTerritory;
+  final double komi;
+  final double blackScore;
+  final double whiteScore;
+  final String winner;
+  final double margin;
+  final String resultString;
+
+  ScoringResult({
+    required this.blackStones,
+    required this.whiteStones,
+    required this.blackTerritory,
+    required this.whiteTerritory,
+    required this.komi,
+    required this.blackScore,
+    required this.whiteScore,
+    required this.winner,
+    required this.margin,
+    required this.resultString,
+  });
+}
+
 class MoveRecord {
   final int x;
   final int y;
@@ -44,6 +81,8 @@ class GameState {
   final int currentPlayer;
   final String? result;
   final String? winner;
+  final int consecutivePasses;
+  final EndGameType? endGameType;
 
   GameState({
     required this.boardSize,
@@ -53,6 +92,8 @@ class GameState {
     required this.currentPlayer,
     this.result,
     this.winner,
+    this.consecutivePasses = 0,
+    this.endGameType,
   });
 
   factory GameState.fromJson(Map<String, dynamic> json) {
@@ -74,6 +115,7 @@ class GameState {
       currentPlayer: json['current'] ?? 1,
       result: json['result'],
       winner: json['winner'],
+      consecutivePasses: json['consecutive_passes'] ?? 0,
     );
   }
 
@@ -86,7 +128,32 @@ class GameState {
       'current': currentPlayer,
       'result': result,
       'winner': winner,
+      'consecutive_passes': consecutivePasses,
     };
+  }
+
+  GameState copyWith({
+    int? boardSize,
+    List<List<int>>? board,
+    List<MoveRecord>? moves,
+    double? komi,
+    int? currentPlayer,
+    String? result,
+    String? winner,
+    int? consecutivePasses,
+    EndGameType? endGameType,
+  }) {
+    return GameState(
+      boardSize: boardSize ?? this.boardSize,
+      board: board ?? this.board,
+      moves: moves ?? this.moves,
+      komi: komi ?? this.komi,
+      currentPlayer: currentPlayer ?? this.currentPlayer,
+      result: result ?? this.result,
+      winner: winner ?? this.winner,
+      consecutivePasses: consecutivePasses ?? this.consecutivePasses,
+      endGameType: endGameType ?? this.endGameType,
+    );
   }
 }
 

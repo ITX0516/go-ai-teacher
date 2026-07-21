@@ -11,6 +11,7 @@ String gameToSgf(GameState state, {
 }) {
   final sb = StringBuffer();
   sb.write('(;GM[1]');
+  sb.write('FF[4]');
   sb.write('SZ[${state.boardSize}]');
   sb.write('KM[${state.komi.toStringAsFixed(1)}]');
 
@@ -23,8 +24,17 @@ String gameToSgf(GameState state, {
   if (playerWhite != null && playerWhite.isNotEmpty) {
     sb.write('PW[$playerWhite]');
   }
+
+  // 结果字段：优先使用传入的 result，其次使用 state.result
+  String? finalResult;
   if (result != null && result.isNotEmpty) {
-    sb.write('RE[$result]');
+    finalResult = result;
+  } else if (state.result != null && state.result!.isNotEmpty) {
+    finalResult = _convertToSgfResult(state.result!, state.winner);
+  }
+
+  if (finalResult != null && finalResult.isNotEmpty) {
+    sb.write('RE[$finalResult]');
   }
 
   // 手顺节点
@@ -35,16 +45,49 @@ String gameToSgf(GameState state, {
     sb.write(';$color[$coord]');
   }
 
-  // 当前手数标记（加在最后一个节点上，如果无手则加在根节点）
-  final currentMoveNum = state.moves.length;
-  if (state.moves.isNotEmpty) {
-    sb.write('C[当前手数：$currentMoveNum]');
-  } else {
-    sb.write('C[当前手数：0]');
-  }
-
   sb.write(')');
   return sb.toString();
+}
+
+/// 将中文结果描述转换为 SGF 标准结果格式
+/// SGF RE 字段格式：B+R（黑胜认输）、W+R（白胜认输）、B+8.5（黑胜8.5目）、W+8.5
+String _convertToSgfResult(String result, String? winner) {
+  if (winner == null) return result;
+
+  if (result.contains('认输')) {
+    return winner == 'black' ? 'B+R' : 'W+R';
+  }
+
+  if (result.contains('和棋')) {
+    return '0';
+  }
+
+  // 提取目数
+  final match = RegExp(r'([\d.]+)\s*目').firstMatch(result);
+  if (match != null) {
+    final margin = match.group(1)!;
+    return '${winner == 'black' ? 'B' : 'W'}+$margin';
+  }
+
+  return result;
+}
+
+/// 根据终局类型和结果生成 SGF RE 字段
+String generateSgfResult(EndGameType endGameType, String winner, [double? margin]) {
+  switch (endGameType) {
+    case EndGameType.resign:
+      return '${winner == 'black' ? 'B' : 'W'}+R';
+    case EndGameType.scoring:
+      if (margin != null) {
+        return '${winner == 'black' ? 'B' : 'W'}+${margin.toStringAsFixed(1)}';
+      }
+      return '${winner == 'black' ? 'B' : 'W'}+';
+    case EndGameType.noMoves:
+      if (margin != null) {
+        return '${winner == 'black' ? 'B' : 'W'}+${margin.toStringAsFixed(1)}';
+      }
+      return '${winner == 'black' ? 'B' : 'W'}+';
+  }
 }
 
 /// 将坐标转为 SGF 坐标（2个小写字母）

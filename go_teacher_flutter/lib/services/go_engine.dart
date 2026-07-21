@@ -10,6 +10,7 @@ class GoEngine {
   int consecutivePasses = 0;
   String? result;
   String? winner;
+  EndGameType? endGameType;
   final List<String> _boardHistory = [];
 
   GoEngine({this.boardSize = 19, this.komi = 6.5}) {
@@ -80,16 +81,15 @@ class GoEngine {
       move: 'pass',
     ));
     currentPlayer = opponent;
-
-    if (consecutivePasses >= 2) {
-      _calculateFinalScore();
-    }
   }
 
-  void resign(int color) {
+  void resignAction(int color) {
     if (result != null) return;
     winner = color == GoStone.black ? 'white' : 'black';
-    result = '${color == GoStone.black ? '黑方' : '白方'}投子认输';
+    final loserName = color == GoStone.black ? '黑方' : '白方';
+    final winnerName = winner == 'black' ? '黑方' : '白方';
+    result = '$loserName认输，$winnerName胜';
+    endGameType = EndGameType.resign;
   }
 
   void undo() {
@@ -126,6 +126,262 @@ class GoEngine {
 
       _boardHistory.add(_boardToString());
     }
+  }
+
+  /// 检查指定方是否有合法落子点
+  bool hasLegalMoves(int color) {
+    for (int y = 0; y < boardSize; y++) {
+      for (int x = 0; x < boardSize; x++) {
+        if (board[y][x] == GoStone.empty && _isValidMove(x, y, color)) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  /// 检查是否为合法落子（不修改棋盘）
+  bool _isValidMove(int x, int y, int color) {
+    final originalBoard = _copyBoard(board);
+
+    board[y][x] = color;
+    final opponent = color == GoStone.black ? GoStone.white : GoStone.black;
+
+    bool captured = false;
+    for (final (nx, ny) in _getNeighbors(x, y)) {
+      if (board[ny][nx] == opponent) {
+        final group = _getGroup(nx, ny);
+        if (_countLiberties(group) == 0) {
+          captured = true;
+          for (final (gx, gy) in group) {
+            board[gy][gx] = GoStone.empty;
+          }
+        }
+      }
+    }
+
+    final ownGroup = _getGroup(x, y);
+    final hasLiberty = _countLiberties(ownGroup) > 0;
+
+    board = originalBoard;
+
+    if (!hasLiberty && !captured) return false;
+
+    // 检查打劫
+    final testBoard = _copyBoard(board);
+    testBoard[y][x] = color;
+    for (final (nx, ny) in _getNeighbors(x, y)) {
+      if (testBoard[ny][nx] == opponent) {
+        final group = _getGroupOnBoard(testBoard, nx, ny);
+        if (_countLibertiesOnBoard(testBoard, group) == 0) {
+          for (final (gx, gy) in group) {
+            testBoard[gy][gx] = GoStone.empty;
+          }
+        }
+      }
+    }
+    final boardKey = testBoard.map((row) => row.map((c) => c.toString()).join()).join('|');
+    if (_boardHistory.contains(boardKey)) return false;
+
+    return true;
+  }
+
+  List<(int, int)> _getGroupOnBoard(List<List<int>> testBoard, int x, int y) {
+    final color = testBoard[y][x];
+    if (color == GoStone.empty) return [];
+
+    final group = <(int, int)>[];
+    final visited = <String>{};
+    final stack = <(int, int)>[(x, y)];
+
+    while (stack.isNotEmpty) {
+      final (cx, cy) = stack.removeLast();
+      final key = '$cx,$cy';
+      if (visited.contains(key)) continue;
+      if (testBoard[cy][cx] != color) continue;
+
+      visited.add(key);
+      group.add((cx, cy));
+
+      for (final (nx, ny) in _getNeighbors(cx, cy)) {
+        if (!visited.contains('$nx,$ny')) {
+          stack.add((nx, ny));
+        }
+      }
+    }
+
+    return group;
+  }
+
+  int _countLibertiesOnBoard(List<List<int>> testBoard, List<(int, int)> group) {
+    final liberties = <String>{};
+    for (final (x, y) in group) {
+      for (final (nx, ny) in _getNeighbors(x, y)) {
+        if (testBoard[ny][nx] == GoStone.empty) {
+          liberties.add('$nx,$ny');
+        }
+      }
+    }
+    return liberties.length;
+  }
+
+  /// 获取领地分布图
+  /// 返回二维数组：0=无主, 1=黑领地, 2=白领地
+  List<List<int>> getTerritoryMap() {
+    final territoryMap = List.generate(boardSize, (_) => List.filled(boardSize, GoStone.empty));
+    final visited = List.generate(boardSize, (_) => List.filled(boardSize, false));
+
+    for (int y = 0; y < boardSize; y++) {
+      for (int x = 0; x < boardSize; x++) {
+        if (visited[y][x] || board[y][x] != GoStone.empty) continue;
+
+        final territory = <(int, int)>[];
+        final borders = <int>{};
+        final stack = <(int, int)>[(x, y)];
+
+        while (stack.isNotEmpty) {
+          final (cx, cy) = stack.removeLast();
+          if (visited[cy][cx]) continue;
+          if (board[cy][cx] != GoStone.empty) {
+            borders.add(board[cy][cx]);
+            continue;
+          }
+          visited[cy][cx] = true;
+          territory.add((cx, cy));
+
+          for (final (nx, ny) in _getNeighbors(cx, cy)) {
+            if (!visited[ny][nx]) {
+              stack.add((nx, ny));
+            }
+          }
+        }
+
+        if (borders.length == 1) {
+          final owner = borders.first;
+          for (final (tx, ty) in territory) {
+            territoryMap[ty][tx] = owner;
+          }
+        }
+      }
+    }
+
+    return territoryMap;
+  }
+
+  /// 确认死子并计算最终分数
+  /// deadStones: 用户标记的死子坐标列表
+  ScoringResult calculateScore(List<(int, int)> deadStones) {
+    // 复制棋盘并移除死子
+    final scoringBoard = _copyBoard(board);
+    int blackCaptured = 0;
+    int whiteCaptured = 0;
+
+    for (final (x, y) in deadStones) {
+      if (scoringBoard[y][x] == GoStone.black) {
+        scoringBoard[y][x] = GoStone.empty;
+        whiteCaptured++;
+      } else if (scoringBoard[y][x] == GoStone.white) {
+        scoringBoard[y][x] = GoStone.empty;
+        blackCaptured++;
+      }
+    }
+
+    // 计算领地
+    final territoryMap = List.generate(boardSize, (_) => List.filled(boardSize, GoStone.empty));
+    final visited = List.generate(boardSize, (_) => List.filled(boardSize, false));
+
+    int blackTerritory = 0;
+    int whiteTerritory = 0;
+    int blackStones = 0;
+    int whiteStones = 0;
+
+    for (int y = 0; y < boardSize; y++) {
+      for (int x = 0; x < boardSize; x++) {
+        if (scoringBoard[y][x] == GoStone.black) blackStones++;
+        if (scoringBoard[y][x] == GoStone.white) whiteStones++;
+      }
+    }
+
+    for (int y = 0; y < boardSize; y++) {
+      for (int x = 0; x < boardSize; x++) {
+        if (visited[y][x] || scoringBoard[y][x] != GoStone.empty) continue;
+
+        final territory = <(int, int)>[];
+        final borders = <int>{};
+        final stack = <(int, int)>[(x, y)];
+
+        while (stack.isNotEmpty) {
+          final (cx, cy) = stack.removeLast();
+          if (visited[cy][cx]) continue;
+          if (scoringBoard[cy][cx] != GoStone.empty) {
+            borders.add(scoringBoard[cy][cx]);
+            continue;
+          }
+          visited[cy][cx] = true;
+          territory.add((cx, cy));
+
+          for (final (nx, ny) in _getNeighbors(cx, cy)) {
+            if (!visited[ny][nx]) {
+              stack.add((nx, ny));
+            }
+          }
+        }
+
+        if (borders.length == 1) {
+          if (borders.first == GoStone.black) {
+            blackTerritory += territory.length;
+            for (final (tx, ty) in territory) {
+              territoryMap[ty][tx] = GoStone.black;
+            }
+          } else if (borders.first == GoStone.white) {
+            whiteTerritory += territory.length;
+            for (final (tx, ty) in territory) {
+              territoryMap[ty][tx] = GoStone.white;
+            }
+          }
+        }
+      }
+    }
+
+    // 中国规则：子数 + 领地
+    final blackScore = (blackStones + blackTerritory).toDouble();
+    final whiteScore = (whiteStones + whiteTerritory).toDouble() + komi;
+
+    String resultWinner;
+    double margin;
+    String resultStr;
+
+    if (blackScore > whiteScore) {
+      resultWinner = 'black';
+      margin = blackScore - whiteScore;
+      resultStr = '黑胜 ${margin.toStringAsFixed(1)} 目';
+    } else if (whiteScore > blackScore) {
+      resultWinner = 'white';
+      margin = whiteScore - blackScore;
+      resultStr = '白胜 ${margin.toStringAsFixed(1)} 目';
+    } else {
+      resultWinner = 'draw';
+      margin = 0;
+      resultStr = '和棋';
+    }
+
+    // 更新引擎状态
+    winner = resultWinner;
+    result = resultStr;
+    endGameType = EndGameType.scoring;
+
+    return ScoringResult(
+      blackStones: blackStones,
+      whiteStones: whiteStones,
+      blackTerritory: blackTerritory,
+      whiteTerritory: whiteTerritory,
+      komi: komi,
+      blackScore: blackScore,
+      whiteScore: whiteScore,
+      winner: resultWinner,
+      margin: margin,
+      resultString: resultStr,
+    );
   }
 
   List<(int, int)> _getNeighbors(int x, int y) {
@@ -184,80 +440,6 @@ class GoEngine {
     return board.map((row) => row.map((c) => c.toString()).join()).join('|');
   }
 
-  void _calculateFinalScore() {
-    final territory = countTerritory();
-    final blackScore = territory['black_territory']! + territory['black_stones']!;
-    final whiteScore = territory['white_territory']! + territory['white_stones']! + komi;
-
-    if (blackScore > whiteScore) {
-      winner = 'black';
-      result = '黑胜 ${(blackScore - whiteScore).toStringAsFixed(1)} 目';
-    } else if (whiteScore > blackScore) {
-      winner = 'white';
-      result = '白胜 ${(whiteScore - blackScore).toStringAsFixed(1)} 目';
-    } else {
-      winner = 'draw';
-      result = '和棋';
-    }
-  }
-
-  Map<String, int> countTerritory() {
-    final visited = List.generate(boardSize, (_) => List.filled(boardSize, false));
-    int blackTerritory = 0;
-    int whiteTerritory = 0;
-    int blackStones = 0;
-    int whiteStones = 0;
-
-    for (int y = 0; y < boardSize; y++) {
-      for (int x = 0; x < boardSize; x++) {
-        if (board[y][x] == GoStone.black) blackStones++;
-        if (board[y][x] == GoStone.white) whiteStones++;
-      }
-    }
-
-    for (int y = 0; y < boardSize; y++) {
-      for (int x = 0; x < boardSize; x++) {
-        if (visited[y][x] || board[y][x] != GoStone.empty) continue;
-
-        final territory = <(int, int)>[];
-        final borders = <int>{};
-        final stack = <(int, int)>[(x, y)];
-
-        while (stack.isNotEmpty) {
-          final (cx, cy) = stack.removeLast();
-          if (visited[cy][cx]) continue;
-          if (board[cy][cx] != GoStone.empty) {
-            borders.add(board[cy][cx]);
-            continue;
-          }
-          visited[cy][cx] = true;
-          territory.add((cx, cy));
-
-          for (final (nx, ny) in _getNeighbors(cx, cy)) {
-            if (!visited[ny][nx]) {
-              stack.add((nx, ny));
-            }
-          }
-        }
-
-        if (borders.length == 1) {
-          if (borders.first == GoStone.black) {
-            blackTerritory += territory.length;
-          } else if (borders.first == GoStone.white) {
-            whiteTerritory += territory.length;
-          }
-        }
-      }
-    }
-
-    return {
-      'black_territory': blackTerritory,
-      'white_territory': whiteTerritory,
-      'black_stones': blackStones,
-      'white_stones': whiteStones,
-    };
-  }
-
   GameState toGameState() {
     return GameState(
       boardSize: boardSize,
@@ -267,6 +449,8 @@ class GoEngine {
       currentPlayer: currentPlayer,
       result: result,
       winner: winner,
+      consecutivePasses: consecutivePasses,
+      endGameType: endGameType,
     );
   }
 }

@@ -6,6 +6,8 @@ import '../services/game_service.dart';
 import '../models/game_models.dart';
 import '../models/analysis_data.dart';
 import '../utils/sgf_exporter.dart';
+import 'score_page.dart';
+import 'end_game_page.dart';
 
 class PlayPage extends StatefulWidget {
   const PlayPage({super.key});
@@ -79,8 +81,8 @@ class _PlayPageState extends State<PlayPage> {
         _gameState = result['game'];
       });
       await _runKataGoAnalysis();
-      await Future.delayed(const Duration(milliseconds: 300));
-      await _makeAiMove();
+      // 检查AI是否有合法落子
+      await _checkAndMakeAiMove();
     } catch (e) {
       _showError(e.toString());
     } finally {
@@ -93,6 +95,25 @@ class _PlayPageState extends State<PlayPage> {
       _selectedX = null;
       _selectedY = null;
     });
+  }
+
+  Future<void> _checkAndMakeAiMove() async {
+    if (_gameState == null || _gameState!.result != null) return;
+    final aiColor = 3 - _playerColor;
+    try {
+      final api = context.read<GameService>();
+      final hasMoves = await api.hasLegalMoves(_gameId, aiColor);
+      if (!hasMoves) {
+        // AI无棋可下，提示
+        _showNoMovesDialog(aiColor);
+        return;
+      }
+      await Future.delayed(const Duration(milliseconds: 300));
+      await _makeAiMove();
+    } catch (e) {
+      // 降级：直接尝试AI落子
+      await _makeAiMove();
+    }
   }
 
   Future<void> _makeAiMove() async {
@@ -170,11 +191,15 @@ class _PlayPageState extends State<PlayPage> {
     if (_gameState == null || _isAiThinking) return;
     if (_gameState!.currentPlayer != _playerColor) return;
     if (_gameState!.result != null) return;
+
+    final passCount = _gameState!.consecutivePasses;
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('确认停一手'),
-        content: const Text('确定要停一手（虚着）吗？'),
+        content: Text(passCount == 1
+            ? '对方已停一手，你再停一手将触发数棋。\n确定要停一手吗？'
+            : '确定要停一手（虚着）吗？'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -188,17 +213,24 @@ class _PlayPageState extends State<PlayPage> {
       ),
     );
     if (confirm != true) return;
+
     setState(() => _isLoading = true);
     try {
       final api = context.read<GameService>();
-      final result = await api.playMove(_gameId, -1, -1, _playerColor);
+      final result = await api.pass(_gameId, _playerColor);
       setState(() {
         _gameState = result['game'];
       });
-      if (_gameState!.currentPlayer != _playerColor && _gameState!.result == null) {
-        await Future.delayed(const Duration(milliseconds: 300));
-        await _makeAiMove();
+
+      final shouldEndGame = result['shouldEndGame'] as bool? ?? false;
+      if (shouldEndGame) {
+        // 双方各Pass一次，弹出申请数棋
+        _showScoringDialog();
+        return;
       }
+
+      // AI回合
+      await _checkAndMakeAiMoveAfterPass();
     } catch (e) {
       _showError(e.toString());
     } finally {
@@ -206,13 +238,137 @@ class _PlayPageState extends State<PlayPage> {
     }
   }
 
+  Future<void> _checkAndMakeAiMoveAfterPass() async {
+    if (_gameState == null || _gameState!.result != null) return;
+    final aiColor = 3 - _playerColor;
+    try {
+      final api = context.read<GameService>();
+      final hasMoves = await api.hasLegalMoves(_gameId, aiColor);
+      if (!hasMoves) {
+        _showNoMovesDialog(aiColor);
+        return;
+      }
+      await Future.delayed(const Duration(milliseconds: 300));
+      // AI也选择Pass或落子
+      final result = await api.aiMove(_gameId, aiColor, difficulty: _difficulty);
+      setState(() {
+        _gameState = result['game'];
+      });
+      await _runKataGoAnalysis();
+
+      // 检查是否触发了双方Pass
+      if (_gameState!.consecutivePasses >= 2) {
+        _showScoringDialog();
+      }
+    } catch (e) {
+      _showError(e.toString());
+    }
+  }
+
+  void _showScoringDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.calculate, color: Color(0xFF2D5016)),
+            SizedBox(width: 8),
+            Text('申请数棋'),
+          ],
+        ),
+        content: const Text('双方都已停一手，是否进入数棋模式判定胜负？'),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _continuePlaying();
+            },
+            child: const Text('继续对局'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _enterScoringMode();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF2D5016),
+            ),
+            child: const Text('申请数棋'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _continuePlaying() {
+    // 重置连续Pass计数（实际上通过继续落子自动重置）
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('继续对局，Pass计数将在下次落子时重置')),
+    );
+  }
+
+  void _enterScoringMode() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ScorePage(
+          gameId: _gameId,
+          gameState: _gameState!,
+          playerColor: _playerColor,
+        ),
+      ),
+    ).then((result) {
+      if (result is ScoringResult) {
+        // 数棋完成，进入终局页
+        _navigateToEndGame(result);
+      }
+    });
+  }
+
+  void _showNoMovesDialog(int color) {
+    final colorName = color == GoStone.black ? '黑方' : '白方';
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.block, color: Colors.red),
+            SizedBox(width: 8),
+            Text('无棋可下'),
+          ],
+        ),
+        content: Text('$colorName已无合法落子点，是否进入数棋模式？'),
+        actions: [
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _enterScoringMode();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF2D5016),
+            ),
+            child: const Text('数棋'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _resign() async {
     if (_gameState == null || _gameState!.result != null) return;
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('确认认输'),
-        content: const Text('确定要投子认输吗？'),
+        title: const Row(
+          children: [
+            Icon(Icons.flag, color: Colors.red),
+            SizedBox(width: 8),
+            Text('确认认输'),
+          ],
+        ),
+        content: const Text('确定要投子认输吗？认输后将直接结束本局。'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -232,7 +388,7 @@ class _PlayPageState extends State<PlayPage> {
       final api = context.read<GameService>();
       final game = await api.resign(_gameId, _playerColor);
       setState(() => _gameState = game);
-      _showResultDialog();
+      _navigateToEndGame(null);
     } catch (e) {
       _showError(e.toString());
     } finally {
@@ -240,33 +396,16 @@ class _PlayPageState extends State<PlayPage> {
     }
   }
 
-  void _showResultDialog() {
-    if (_gameState?.result == null) return;
-    final isWin = _gameState!.winner == (_playerColor == 1 ? 'black' : 'white');
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: Row(
-          children: [
-            Icon(
-              isWin ? Icons.emoji_events : Icons.sentiment_dissatisfied,
-              color: isWin ? Colors.amber : Colors.grey,
-            ),
-            const SizedBox(width: 8),
-            Text(isWin ? '你赢了！' : '再接再厉'),
-          ],
+  void _navigateToEndGame(ScoringResult? scoringResult) {
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (context) => EndGamePage(
+          gameState: _gameState!,
+          playerColor: _playerColor,
+          gameId: _gameId,
+          scoringResult: scoringResult,
         ),
-        content: Text(_gameState!.result!),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _initGame();
-            },
-            child: const Text('再来一局'),
-          ),
-        ],
       ),
     );
   }
@@ -277,18 +416,15 @@ class _PlayPageState extends State<PlayPage> {
     setState(() => _isLoading = true);
     try {
       final api = context.read<GameService>();
-      // 生成 SGF 棋谱
       final sgf = gameToSgf(
         _gameState!,
         playerBlack: '玩家',
         playerWhite: 'AI老师',
       );
-      // 打印 SGF 到日志（调试用）
       debugPrint('===== AI 讲解 SGF =====');
       debugPrint(sgf);
       debugPrint('=======================');
 
-      // 构建关键区域描述（简化版：基于棋盘状态）
       final areas = <Map<String, String>>[];
       if (_katagoAnalysis != null) {
         areas.add({
@@ -668,6 +804,8 @@ class _PlayPageState extends State<PlayPage> {
         _infoItem('手数', '${_gameState!.moves.length}'),
         _infoItem('贴目', '${_gameState!.komi}'),
         _infoItem('难度', _difficultyLabel),
+        if (_gameState!.consecutivePasses > 0)
+          _infoItem('停手', '${_gameState!.consecutivePasses}/2'),
       ],
     );
   }
@@ -779,6 +917,7 @@ class _PlayPageState extends State<PlayPage> {
   }
 
   Widget _buildControls() {
+    final canShowScoring = _gameState!.consecutivePasses >= 2;
     return Column(
       children: [
         Row(
@@ -795,7 +934,9 @@ class _PlayPageState extends State<PlayPage> {
             Expanded(
               child: _controlButton(
                 icon: Icons.pause_circle_outline,
-                label: '停一手',
+                label: _gameState!.consecutivePasses > 0
+                    ? '停一手(${_gameState!.consecutivePasses}/2)'
+                    : '停一手',
                 onTap: _passMove,
                 color: const Color(0xFF8E44AD),
               ),
@@ -833,6 +974,24 @@ class _PlayPageState extends State<PlayPage> {
             ),
           ],
         ),
+        const SizedBox(height: 8),
+        if (canShowScoring)
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: _enterScoringMode,
+              icon: const Icon(Icons.calculate),
+              label: const Text('申请数棋'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF2D5016),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ),
         const SizedBox(height: 8),
         SizedBox(
           width: double.infinity,

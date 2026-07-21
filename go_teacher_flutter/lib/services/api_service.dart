@@ -94,8 +94,78 @@ class ApiService implements GameService {
   }
 
   Future<GameState> resign(String gameId, int color) async {
-    // 后端暂未提供 resign 接口，返回当前游戏状态
-    return getGame(gameId);
+    final response = await _client.post(
+      Uri.parse('$baseUrl/api/games/$gameId/resign'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'color': color}),
+    );
+    if (response.statusCode == 200) {
+      return GameState.fromJson(jsonDecode(response.body));
+    }
+    throw Exception('Failed to resign');
+  }
+
+  Future<Map<String, dynamic>> pass(String gameId, int color) async {
+    final response = await _client.post(
+      Uri.parse('$baseUrl/api/games/$gameId/pass'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'color': color}),
+    );
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return {
+        'game': GameState.fromJson(data['game']),
+        'shouldEndGame': data['should_end_game'] ?? false,
+      };
+    }
+    throw Exception('Failed to pass: ${response.body}');
+  }
+
+  Future<bool> hasLegalMoves(String gameId, int color) async {
+    final response = await _client.get(
+      Uri.parse('$baseUrl/api/games/$gameId/has-moves?color=$color'),
+    );
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return data['has_moves'] ?? false;
+    }
+    throw Exception('Failed to check legal moves');
+  }
+
+  Future<Map<String, dynamic>> getScoringData(String gameId) async {
+    final response = await _client.get(
+      Uri.parse('$baseUrl/api/games/$gameId/scoring'),
+    );
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    }
+    throw Exception('Failed to get scoring data');
+  }
+
+  Future<ScoringResult> confirmDeadStones(String gameId, List<(int, int)> deadStones) async {
+    final response = await _client.post(
+      Uri.parse('$baseUrl/api/games/$gameId/score'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'dead_stones': deadStones.map((s) => {'x': s.$1, 'y': s.$2}).toList(),
+      }),
+    );
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return ScoringResult(
+        blackStones: data['black_stones'] ?? 0,
+        whiteStones: data['white_stones'] ?? 0,
+        blackTerritory: data['black_territory'] ?? 0,
+        whiteTerritory: data['white_territory'] ?? 0,
+        komi: (data['komi'] ?? 6.5).toDouble(),
+        blackScore: (data['black_score'] ?? 0).toDouble(),
+        whiteScore: (data['white_score'] ?? 0).toDouble(),
+        winner: data['winner'] ?? 'draw',
+        margin: (data['margin'] ?? 0).toDouble(),
+        resultString: data['result_string'] ?? '',
+      );
+    }
+    throw Exception('Failed to confirm dead stones');
   }
 
   Future<AnalysisResult> analyze(String gameId) async {

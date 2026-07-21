@@ -25,12 +25,12 @@ jobs:
           java-version: '17'
           distribution: 'zulu'
 
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.25.0'
-          channel: 'stable'
-          cache: false
+      - name: Setup Flutter manually
+        run: |
+          curl -O https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_3.25.3-stable.tar.xz
+          tar xf flutter_linux_3.25.3-stable.tar.xz
+          echo "$(pwd)/flutter/bin" >> $GITHUB_PATH
+          flutter --version
 
       - name: Install Flutter dependencies
         run: flutter pub get

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/config_service.dart';
 import '../services/game_service.dart';
+import '../utils/app_info.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -246,9 +247,9 @@ class _SettingsPageState extends State<SettingsPage> {
                     style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 8),
-                  const Text(
-                    '版本号：master1.0.00',
-                    style: TextStyle(color: Colors.grey, fontSize: 14),
+                  Text(
+                    '版本号：${AppInfo.fullVersion}',
+                    style: const TextStyle(color: Colors.grey, fontSize: 14),
                   ),
                 ],
               ),

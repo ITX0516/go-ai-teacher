@@ -766,7 +766,7 @@ class _PlayPageState extends State<PlayPage> {
                 color: const Color(0xFF718096),
               ),
             ),
-            const SizedBox(width: 6),
+            const SizedBox(width: 8),
             Expanded(
               child: _controlButton(
                 icon: Icons.pause_circle_outline,
@@ -775,7 +775,7 @@ class _PlayPageState extends State<PlayPage> {
                 color: const Color(0xFF8E44AD),
               ),
             ),
-            const SizedBox(width: 6),
+            const SizedBox(width: 8),
             Expanded(
               child: _controlButton(
                 icon: Icons.lightbulb,
@@ -784,7 +784,11 @@ class _PlayPageState extends State<PlayPage> {
                 color: const Color(0xFFE67E22),
               ),
             ),
-            const SizedBox(width: 6),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
             Expanded(
               child: _controlButton(
                 icon: Icons.analytics,
@@ -793,7 +797,7 @@ class _PlayPageState extends State<PlayPage> {
                 color: const Color(0xFF1E3A5F),
               ),
             ),
-            const SizedBox(width: 6),
+            const SizedBox(width: 8),
             Expanded(
               child: _controlButton(
                 icon: Icons.flag,

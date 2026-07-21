@@ -229,6 +229,25 @@ class _SettingsPageState extends State<SettingsPage> {
                     '【如何获取电脑IP】\n'
                     'Windows: cmd → ipconfig\n'
                     'macOS/Linux: terminal → ifconfig 或 ip addr',
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    '版本信息',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    '版本号：master1.0.00',
                     style: TextStyle(color: Colors.grey, fontSize: 14),
                   ),
                 ],

@@ -4,10 +4,55 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"go_teacher/internal/models"
+	"io"
 	"net/http"
 )
+
+// 提示词模板1：错手分析 - 安抚情绪+通俗比喻+改进建议
+const systemPromptExplainMove = `你是一位耐心的围棋老师，正在给学生讲解一步棋。
+
+你的风格：
+- 先安抚情绪，从正面角度切入，绝不说"这步很烂"、"下得太差"之类的话
+- 用生活化的比喻解释棋理（如"就像盖房子要先打地基"）
+- 给出具体的改进方向，让学生知道下次怎么下更好
+- 语气温暖、鼓励，像一位陪伴成长的朋友
+
+回答格式（控制在200字以内）：
+1. 先说这步棋的意图（让学生感觉被理解）
+2. 用比喻解释为什么可能不是最优
+3. 指出1-2个更好的下法方向
+4. 结尾给一句鼓励的话`
+
+// 提示词模板2：形势判断 - 生活化比喻+要点提示
+const systemPromptExplainPosition = `你是一位围棋老师，正在帮学生判断当前局面形势。
+
+你的风格：
+- 用生活化的比喻描述形势（如"你现在像在爬坡，有点累但风景不错"）
+- 避免堆砌专业术语，用学生能懂的话解释
+- 指出双方的要点和急所（用坐标说明，如"黑棋在D4位有个大场"）
+- 给出1-2个具体可行的建议
+
+回答格式（控制在250字以内）：
+1. 用比喻描述当前形势
+2. 指出双方的要点（各说1-2个）
+3. 给出下一步的具体建议
+4. 鼓励学生继续保持思考`
+
+// 提示词模板3：复盘总结 - 亮点+改进+鼓励
+const systemPromptAnalyzeSummary = `你是一位围棋老师，正在帮学生复盘整局棋。
+
+你的风格：
+- 整体评价要客观，但要有温度和鼓励
+- 具体指出好棋和问题棋（用手数和坐标说明）
+- 让学生感觉到进步的空间，而不是被批评
+- 结尾给一句暖心的话，让学生愿意继续学
+
+回答格式（控制在300字以内）：
+1. 整体评价一句话（如"这盘棋你展现了不错的攻防意识"）
+2. 3个亮点：具体手数+为什么好（用通俗话解释）
+3. 2个改进点：具体手数+怎么改更好
+4. 结尾一句鼓励的话（如"继续加油，你的棋力在稳步提升！"）`
 
 type DeepSeekService struct {
 	apiKey string
@@ -46,23 +91,14 @@ type deepseekResponse struct {
 }
 
 func (s *DeepSeekService) ExplainMove(move string, moveNumber int, winRateChange float64, gameContext string) (*models.Explanation, error) {
-	prompt := fmt.Sprintf(`你是一位专业的围棋老师，请用通俗易懂的语言讲解这步棋。
+	userPrompt := fmt.Sprintf(`请讲解这步棋：
+- 第 %d 手，落子位置：%s
+- 胜率变化：%+.1f%%
+- 局面描述：%s
 
-背景信息：
-- 第 %d 手棋
-- 落子位置：%s
-- 胜率变化：%+.2f%%
-- 当前局面：%s
+请用通俗语言讲解，先说意图，再指出更好的下法。`, moveNumber, move, winRateChange, gameContext)
 
-请从以下几个方面讲解（用中文回答）：
-1. 这步棋的意图和目的
-2. 这步棋的质量评价（好棋/疑问手/恶手）及原因
-3. 有没有更好的下法建议
-4. 对于初学者的棋理提示
-
-请用友好、鼓励的语气，就像一位耐心的围棋老师在讲解。`, moveNumber, move, winRateChange, gameContext)
-
-	response, err := s.chat(prompt)
+	response, err := s.chat(systemPromptExplainMove, userPrompt)
 	if err != nil {
 		return nil, err
 	}
@@ -84,40 +120,37 @@ func (s *DeepSeekService) ExplainMove(move string, moveNumber int, winRateChange
 }
 
 func (s *DeepSeekService) ExplainPosition(gameSGF string, userQuestion string) (string, error) {
-	prompt := fmt.Sprintf(`你是一位专业的围棋老师。以下是当前棋局的SGF棋谱：
+	userPrompt := fmt.Sprintf(`当前棋局SGF棋谱：
 %s
 
-用户的问题：%s
+用户问题：%s
 
-请用通俗易懂的中文回答，结合具体的棋理进行讲解。如果涉及到具体的棋子位置，请用坐标说明（如：黑棋在D4位）。`, gameSGF, userQuestion)
+请用通俗语言判断形势，指出双方要点。`, gameSGF, userQuestion)
 
-	return s.chat(prompt)
+	return s.chat(systemPromptExplainPosition, userPrompt)
 }
 
 func (s *DeepSeekService) AnalyzeGameSummary(sgf string, result string) (string, error) {
-	prompt := fmt.Sprintf(`你是一位专业的围棋老师，请对下面这盘棋做一个整体复盘总结。
-
-棋谱SGF：
+	userPrompt := fmt.Sprintf(`棋谱SGF：
 %s
 
 结果：%s
 
-请从以下几个方面分析（用中文回答）：
-1. 本局的关键转折点
-2. 优势方是如何建立和保持优势的
-3. 劣势方有哪些可以改进的地方
-4. 全局的棋理要点总结
-5. 给对局者的建议
+请做复盘总结：整体评价+3个亮点+2个改进点+鼓励。`, sgf, result)
 
-请用友好、鼓励的语气，结构清晰。`, sgf, result)
-
-	return s.chat(prompt)
+	return s.chat(systemPromptAnalyzeSummary, userPrompt)
 }
 
 func (s *DeepSeekService) GeneratePuzzleExplanation(puzzle *models.Puzzle, isCorrect bool, userMove string) (string, error) {
-	prompt := fmt.Sprintf(`你是一位耐心的围棋死活题老师。
+	systemPrompt := `你是一位耐心的围棋死活题老师，正在讲解一道题目。
 
-题目：%s
+你的风格：
+- 先肯定学生的思考过程，再指出问题
+- 用通俗语言解释棋理，避免术语堆砌
+- 给出具体的解题思路和关键点
+- 结尾鼓励学生继续努力`
+
+	userPrompt := fmt.Sprintf(`题目：%s
 难度：%s
 描述：%s
 正确答案序列：%v
@@ -125,16 +158,12 @@ func (s *DeepSeekService) GeneratePuzzleExplanation(puzzle *models.Puzzle, isCor
 用户走了：%s
 是否正确：%v
 
-请给用户讲解这道题（用中文，友好鼓励的语气）：
-1. 解释用户这步棋的问题或亮点
-2. 讲解正确的解题思路
-3. 涉及的棋理和技巧
-4. 举一反三的提示`, puzzle.Title, puzzle.Difficulty, puzzle.Description, puzzle.CorrectMoves, userMove, isCorrect)
+请讲解这道题：先说用户这步棋的问题或亮点，再讲解正确思路。`, puzzle.Title, puzzle.Difficulty, puzzle.Description, puzzle.CorrectMoves, userMove, isCorrect)
 
-	return s.chat(prompt)
+	return s.chat(systemPrompt, userPrompt)
 }
 
-func (s *DeepSeekService) chat(userMessage string) (string, error) {
+func (s *DeepSeekService) chat(systemPrompt, userMessage string) (string, error) {
 	if s.apiKey == "" {
 		return s.mockResponse(userMessage), nil
 	}
@@ -143,7 +172,7 @@ func (s *DeepSeekService) chat(userMessage string) (string, error) {
 		Model:  "deepseek-chat",
 		Stream: false,
 		Messages: []deepseekMessage{
-			{Role: "system", Content: "你是一位专业的围棋老师，精通围棋棋理、死活、定式、布局、中盘、官子等各方面知识。你擅长用通俗易懂的语言讲解复杂的围棋概念，语气友好、耐心、鼓励。"},
+			{Role: "system", Content: systemPrompt},
 			{Role: "user", Content: userMessage},
 		},
 	}

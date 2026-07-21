@@ -6,7 +6,7 @@ class AppInfo {
   static const String branch = 'master';
 
   /// 主版本.次版本.补丁号（补丁号十进制递增）
-  static const String version = '1.0.01';
+  static const String version = '1.0.02';
 
   /// 完整版本标识：分支+版本号
   static String get fullVersion => '$branch$version';

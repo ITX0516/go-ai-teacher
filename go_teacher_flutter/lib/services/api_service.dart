@@ -203,16 +203,29 @@ class ApiService implements GameService {
   }
 
   Future<String> askQuestion(String gameId, String gameSgf, String question) async {
+    return chatWithHistory(gameId, gameSgf, question, []);
+  }
+
+  Future<String> chatWithHistory(
+    String gameId,
+    String sgf,
+    String question,
+    List<Map<String, String>> history,
+  ) async {
     final response = await _client.post(
-      Uri.parse('$baseUrl/api/games/$gameId/ask'),
+      Uri.parse('$baseUrl/api/chat'),
       headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'game_sgf': gameSgf, 'question': question}),
+      body: jsonEncode({
+        'sgf': sgf,
+        'question': question,
+        'history': history,
+      }),
     );
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
       return data['answer'] ?? '';
     }
-    throw Exception('Failed to get answer');
+    throw Exception('Failed to chat: ${response.body}');
   }
 
   Future<List<Puzzle>> getPuzzles({String? category, String? difficulty}) async {

@@ -34,6 +34,15 @@ abstract class GameService {
     List<Map<String, String>>? areas,
   });
   Future<String> askQuestion(String gameId, String gameSgf, String question);
+
+  /// 带历史记录的聊天接口（微信式 AI 老师面板用）
+  Future<String> chatWithHistory(
+    String gameId,
+    String sgf,
+    String question,
+    List<Map<String, String>> history,
+  );
+
   Future<List<Puzzle>> getPuzzles({String? category, String? difficulty});
   Future<Puzzle> getPuzzle(String id);
   Future<Map<String, dynamic>> checkPuzzleAnswer(String id, String move);

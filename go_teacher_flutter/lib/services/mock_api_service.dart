@@ -197,9 +197,18 @@ class MockApiService implements GameService {
   }
 
   Future<String> askQuestion(String gameId, String gameSgf, String question) async {
+    return chatWithHistory(gameId, gameSgf, question, []);
+  }
+
+  Future<String> chatWithHistory(
+    String gameId,
+    String sgf,
+    String question,
+    List<Map<String, String>> history,
+  ) async {
     if (_deepSeek != null) {
       try {
-        return await _deepSeek!.askQuestion(question, gameSgf);
+        return await _deepSeek!.askQuestion(question, sgf);
       } catch (e) {
         // Fall through to mock
       }
@@ -208,12 +217,20 @@ class MockApiService implements GameService {
     await Future.delayed(const Duration(milliseconds: 500));
 
     final q = question.toLowerCase();
-    if (q.contains('为什么') || q.contains('why')) {
+    if (q.contains('分析') || q.contains('局面')) {
+      return '当前局面分析：黑棋在左上角和右下角有实地，白棋在右上和左下形成模样。整体来看局面大致均衡，黑棋稍优。关键点在于中腹的争夺，谁能先手占到好点，谁就能掌握主动权。建议关注D10、K10等大场。';
+    } else if (q.contains('问题') || q.contains('坏')) {
+      return '上一步稍有问题，落子位置略偏，没有最大限度发挥棋子效率。更好的选择是先在高位浅消对方模样，然后再回防。不过整体局势尚可，不必过于担心，后续注意保持棋子之间的联系即可。';
+    } else if (q.contains('形势') || q.contains('全局')) {
+      return '全局形势判断：\n• 黑棋实地约 45 目\n• 白棋实地约 40 目\n• 贴目 6.5 目\n\n当前黑棋略优约 5 目，但白棋外势较厚，后续有发展潜力。建议黑棋稳健运营，不要过分用强。';
+    } else if (q.contains('推荐') || q.contains('下一步')) {
+      return '推荐落点：D16（星位高位守角）\n\n这手棋既巩固了右上角的实地，又对白棋右上模样形成限制，是一举两得的好点。胜率预计可提升 3-5%。';
+    } else if (q.contains('收官')) {
+      return '收官阶段建议：\n1. 先收双方先手官子\n2. 再收己方先手官子\n3. 最后收双方后手官子\n\n当前最大的官子是右下角的扳粘，目数约 6 目，优先抢占。';
+    } else if (q.contains('为什么') || q.contains('why')) {
       return '这是一个很好的问题！在围棋中，每一步棋都有其背后的棋理。简单来说，这步棋的主要目的是：1）巩固自身的棋形；2）扩张地盘；3）对对方施加压力。围棋讲究"宁失数子，勿失一先"，掌握主动权是取胜的关键。建议你在实战中多体会每一步棋的意图，棋力会快速提升的！';
     } else if (q.contains('怎么') || q.contains('how')) {
       return '要提高这方面的能力，我的建议是：1）多做死活题，培养计算能力；2）研究职业棋谱，学习高手的思路；3）在实战中勇于尝试，不怕犯错；4）下完棋后认真复盘，总结经验。坚持这些方法，棋力一定会有显著提升！';
-    } else if (q.contains('规则') || q.contains('rule')) {
-      return '围棋的基本规则其实很简单：1）黑先白后，轮流落子；2）棋子落在交叉点上；3）被围住的棋子要被提掉；4）不能下在没有气的位置（自杀）；5）打劫需要隔一手才能提回；6）最后数子或数目决定胜负。掌握了这些基本规则就可以下棋了，更深入的规则可以在实战中慢慢学习。';
     } else {
       return '你的问题很有意思！关于这盘棋的局势，我认为当前的关键是把握好大场和急所的关系。围棋中有句话叫"急所胜过大场"，意思是关系到双方棋子死活或厚薄的要点比单纯围空更重要。建议你重点关注棋形的要点，这将是决定棋局走向的关键因素。';
     }

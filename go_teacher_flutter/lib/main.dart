@@ -4,6 +4,7 @@ import 'services/game_service.dart';
 import 'services/api_service.dart';
 import 'services/mock_api_service.dart';
 import 'services/config_service.dart';
+import 'services/chat_service.dart';
 import 'pages/home_page.dart';
 import 'pages/play_page.dart';
 import 'pages/puzzles_page.dart';
@@ -28,6 +29,7 @@ class MyApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         Provider<ConfigService>.value(value: configService),
+        ChangeNotifierProvider<ChatService>(create: (_) => ChatService()),
         Provider<GameService>(
           create: (_) => configService.isOfflineMode
               ? MockApiService()

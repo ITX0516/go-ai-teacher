@@ -1,15 +1,28 @@
-name: Flutter Build APK
+name: Build Flutter Android APK
 
 on:
+  workflow_dispatch:
   push:
-    branches: [main]
-  workflow_dispatch:  # 支持手动触发
+    branches:
+      - main
+      - master
+    paths:
+      - "go_teacher_flutter/**"
+      - "go_teacher/**"
+      - ".github/workflows/flutter-android-apk.yml"
 
 jobs:
-  build:
+  build-android-apk:
+    name: Build Android APK
     runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: go_teacher_flutter
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -17,24 +30,23 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - uses: subosito/flutter-action@v2
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.24.5'
-          channel: 'stable'
+          channel: stable
           cache: true
 
+      - name: Show Flutter version
+        run: flutter --version
+
       - name: Install dependencies
-        run: |
-          cd go_teacher_flutter
-          flutter pub get
+        run: flutter pub get
 
-      - name: Build APK (ARM64 only)
-        run: |
-          cd go_teacher_flutter
-          flutter build apk --release --target-platform android-arm64
+      - name: Build release APK
+        run: flutter build apk --release
 
-      - name: Upload APK
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: release-apk-arm64
+          name: go-ai-teacher-release-apk
           path: go_teacher_flutter/build/app/outputs/flutter-apk/app-release.apk

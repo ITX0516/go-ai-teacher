@@ -192,10 +192,17 @@ func (h *GameHandler) Analyze(c *gin.Context) {
 }
 
 type explainRequest struct {
+	SGF           string  `json:"sgf"`
 	MoveNumber    int     `json:"move_number"`
 	Move          string  `json:"move"`
 	WinRateChange float64 `json:"win_rate_change"`
-	Context       string  `json:"context"`
+	WinRate       float64 `json:"win_rate"`
+	ScoreLead     float64 `json:"score_lead"`
+	CurrentTurn   string  `json:"current_turn"`
+	Areas         []struct {
+		Location string `json:"location"`
+		Desc     string `json:"desc"`
+	} `json:"areas,omitempty"`
 }
 
 func (h *GameHandler) ExplainMove(c *gin.Context) {
@@ -204,7 +211,29 @@ func (h *GameHandler) ExplainMove(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	explanation, err := h.deepseekService.ExplainMove(req.Move, req.MoveNumber, req.WinRateChange, req.Context)
+
+	// 如果没传 SGF，尝试从 gameID 生成
+	if req.SGF == "" {
+		gameID := c.Param("id")
+		if game, ok := h.gameService.GetGame(gameID); ok {
+			req.SGF = h.gameService.GameToSGF(game)
+		}
+	}
+
+	analysis := &services.MoveAnalysisData{
+		WinRate:       req.WinRate,
+		ScoreLead:     req.ScoreLead,
+		WinRateChange: req.WinRateChange,
+		MoveNumber:    req.MoveNumber,
+		CurrentTurn:   req.CurrentTurn,
+	}
+
+	areas := make([]services.AreaDescription, 0, len(req.Areas))
+	for _, a := range req.Areas {
+		areas = append(areas, services.AreaDescription{Location: a.Location, Desc: a.Desc})
+	}
+
+	explanation, err := h.deepseekService.ExplainMove(req.Move, req.MoveNumber, req.WinRateChange, req.SGF, analysis, areas)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

@@ -5,6 +5,7 @@ import '../widgets/win_rate_bar.dart';
 import '../services/game_service.dart';
 import '../models/game_models.dart';
 import '../models/analysis_data.dart';
+import '../utils/sgf_exporter.dart';
 
 class PlayPage extends StatefulWidget {
   const PlayPage({super.key});
@@ -276,12 +277,36 @@ class _PlayPageState extends State<PlayPage> {
     setState(() => _isLoading = true);
     try {
       final api = context.read<GameService>();
+      // 生成 SGF 棋谱
+      final sgf = gameToSgf(
+        _gameState!,
+        playerBlack: '玩家',
+        playerWhite: 'AI老师',
+      );
+      // 打印 SGF 到日志（调试用）
+      debugPrint('===== AI 讲解 SGF =====');
+      debugPrint(sgf);
+      debugPrint('=======================');
+
+      // 构建关键区域描述（简化版：基于棋盘状态）
+      final areas = <Map<String, String>>[];
+      if (_katagoAnalysis != null) {
+        areas.add({
+          'location': '全局形势',
+          'desc': '当前胜率 ${(_katagoAnalysis!.winrate * 100).toStringAsFixed(1)}%，目差 ${_katagoAnalysis!.scoreLead.toStringAsFixed(1)} 目',
+        });
+      }
+
       final exp = await api.explainMove(
         _gameId,
         lastMove.move,
         _gameState!.moves.length,
         -2.5,
-        '布局阶段',
+        sgf,
+        winRate: _katagoAnalysis != null ? _katagoAnalysis!.winrate * 100 : null,
+        scoreLead: _katagoAnalysis?.scoreLead,
+        currentTurn: _gameState!.currentPlayer == GoStone.black ? '黑棋' : '白棋',
+        areas: areas.isNotEmpty ? areas : null,
       );
       setState(() => _explanation = exp.explanation);
       _showExplanationDialog();

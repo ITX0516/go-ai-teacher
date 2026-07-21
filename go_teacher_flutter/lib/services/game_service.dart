@@ -9,7 +9,12 @@ abstract class GameService {
   Future<GameState> undoMove(String gameId);
   Future<GameState> resign(String gameId, int color);
   Future<AnalysisResult> analyze(String gameId);
-  Future<Explanation> explainMove(String gameId, String move, int moveNumber, double winRateChange, String context);
+  Future<Explanation> explainMove(String gameId, String move, int moveNumber, double winRateChange, String sgf, {
+    double? winRate,
+    double? scoreLead,
+    String? currentTurn,
+    List<Map<String, String>>? areas,
+  });
   Future<String> askQuestion(String gameId, String gameSgf, String question);
   Future<List<Puzzle>> getPuzzles({String? category, String? difficulty});
   Future<Puzzle> getPuzzle(String id);

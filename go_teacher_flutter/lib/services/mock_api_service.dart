@@ -113,13 +113,15 @@ class MockApiService implements GameService {
     String move,
     int moveNumber,
     double winRateChange,
-    String context,
-  ) async {
+    String sgf, {
+    double? winRate,
+    double? scoreLead,
+    String? currentTurn,
+    List<Map<String, String>>? areas,
+  }) async {
     if (_deepSeek != null) {
       try {
-        final engine = _games[gameId];
-        final sgf = engine != null ? _engineToSgf(engine) : null;
-        final text = await _deepSeek!.explainMove(move, moveNumber, context, sgf);
+        final text = await _deepSeek!.explainMove(move, moveNumber, winRateChange, sgf);
         return Explanation(
           move: move,
           explanation: text,

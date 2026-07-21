@@ -38,27 +38,33 @@ class DeepSeekService {
     }
   }
 
-  Future<String> explainMove(String move, int moveNumber, String context, String? gameSgf) async {
-    const systemPrompt = '''你是一位资深的围棋AI老师，教学经验丰富，善于用通俗易懂的语言讲解围棋知识。
-请针对学生的问题，给出专业但不晦涩的讲解，结合棋理和实战经验，帮助学生理解每一步棋的意图和价值。
-讲解时注意：
-1. 先直接回答问题，再展开分析
-2. 结合具体的棋形和局面
-3. 适当引用围棋谚语或口诀
-4. 给出后续的学习建议
-5. 语言亲切自然，像一位耐心的老师''';
+  Future<String> explainMove(String move, int moveNumber, double winRateChange, String? gameSgf) async {
+    const systemPrompt = '''你是一位耐心的围棋老师，正在给学生讲解一步棋。
 
-    final userPrompt = '''请分析这步棋：
-- 着点：$move
-- 手数：第 $moveNumber 手
-- 阶段：$context
-- 当前局面：${gameSgf ?? '（暂无完整棋谱）'}
+我会给你这盘棋的 SGF 格式棋谱（包含全部手顺和坐标），请你基于完整棋局进行复盘分析。
+注意：分析"已经下过的这步棋"为什么好/不好，不要主动推荐下一手。
 
-请从以下几个方面讲解：
-1. 这步棋的意图是什么？
-2. 这步棋的好坏评价
-3. 有没有更好的选择？
-4. 给学生的建议和提示''';
+你的风格：
+- 先安抚情绪，从正面角度切入，绝不说"这步很烂"、"下得太差"之类的话
+- 用生活化的比喻解释棋理（如"就像盖房子要先打地基"）
+- 给出具体的改进方向，让学生知道下次怎么下更好
+- 语气温暖、鼓励，像一位陪伴成长的朋友
+- 基于完整 SGF 棋谱进行全局分析，而不是只看单步
+
+回答格式（控制在300字以内）：
+1. 先说这步棋的意图（让学生感觉被理解）
+2. 结合全局形势，用比喻解释为什么可能不是最优
+3. 指出1-2个更好的下法方向（结合棋谱中的空点）
+4. 结尾给一句鼓励的话''';
+
+    final userPrompt = '''【棋局信息】
+当前手数：第 $moveNumber 手
+
+【SGF 棋谱】
+${gameSgf ?? '（暂无完整棋谱）'}
+
+【用户问题】
+请分析第$moveNumber手 $move 的问题。''';
 
     return chat(systemPrompt, userPrompt);
   }

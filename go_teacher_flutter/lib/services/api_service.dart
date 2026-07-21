@@ -98,15 +98,24 @@ class ApiService implements GameService {
     throw Exception('Failed to analyze');
   }
 
-  Future<Explanation> explainMove(String gameId, String move, int moveNumber, double winRateChange, String context) async {
+  Future<Explanation> explainMove(String gameId, String move, int moveNumber, double winRateChange, String sgf, {
+    double? winRate,
+    double? scoreLead,
+    String? currentTurn,
+    List<Map<String, String>>? areas,
+  }) async {
     final response = await _client.post(
       Uri.parse('$baseUrl/api/games/$gameId/explain'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
+        'sgf': sgf,
         'move_number': moveNumber,
         'move': move,
         'win_rate_change': winRateChange,
-        'context': context,
+        'win_rate': winRate,
+        'score_lead': scoreLead,
+        'current_turn': currentTurn,
+        'areas': areas,
       }),
     );
     if (response.statusCode == 200) {

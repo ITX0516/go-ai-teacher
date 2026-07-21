@@ -1,0 +1,82 @@
+[
+  {
+    "id": "p001",
+    "title": "直三死活",
+    "difficulty": "beginner",
+    "category": "life_death",
+    "description": "黑先，如何做活？",
+    "sgf_path": "data/puzzles/1_直三.sgf"
+  },
+  {
+    "id": "p002",
+    "title": "弯三死活",
+    "difficulty": "beginner",
+    "category": "life_death",
+    "description": "黑先，如何做活？",
+    "sgf_path": "data/puzzles/2_弯三.sgf"
+  },
+  {
+    "id": "p003",
+    "title": "丁四死活",
+    "difficulty": "beginner",
+    "category": "life_death",
+    "description": "黑先，如何做活？",
+    "sgf_path": "data/puzzles/3_丁四.sgf"
+  },
+  {
+    "id": "p004",
+    "title": "倒扑吃子",
+    "difficulty": "beginner",
+    "category": "capture",
+    "description": "黑先，如何吃住白棋？",
+    "sgf_path": "data/puzzles/4_倒扑.sgf"
+  },
+  {
+    "id": "p005",
+    "title": "征子练习",
+    "difficulty": "beginner",
+    "category": "capture",
+    "description": "黑先，能否征吃白子？",
+    "sgf_path": "data/puzzles/5_征子.sgf"
+  },
+  {
+    "id": "p006",
+    "title": "星位小飞挂",
+    "difficulty": "intermediate",
+    "category": "joseki",
+    "description": "黑星位，白小飞挂，黑如何应对？",
+    "sgf_path": "data/puzzles/6_星位小飞挂.sgf"
+  },
+  {
+    "id": "p007",
+    "title": "双吃吃子",
+    "difficulty": "beginner",
+    "category": "capture",
+    "description": "黑先，如何双吃白棋？",
+    "sgf_path": "data/puzzles/7_双吃.sgf"
+  },
+  {
+    "id": "p008",
+    "title": "枷吃吃子",
+    "difficulty": "intermediate",
+    "category": "capture",
+    "description": "黑先，如何枷吃白棋？",
+    "sgf_path": "data/puzzles/8_枷吃.sgf"
+  },
+  {
+    "id": "p009",
+    "title": "接不归",
+    "difficulty": "intermediate",
+    "category": "capture",
+    "description": "黑先，如何利用接不归吃子？",
+    "sgf_path": "data/puzzles/9_接不归.sgf"
+  },
+  {
+    "id": "p010",
+    "title": "立四死活",
+    "difficulty": "beginner",
+    "category": "life_death",
+    "description": "黑先，立四是活形吗？",
+    "sgf_path": "data/puzzles/10_立四.sgf"
+  }
+]

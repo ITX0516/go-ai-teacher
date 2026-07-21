@@ -160,17 +160,39 @@ func (s *DeepSeekService) GeneratePuzzleExplanation(puzzle *models.Puzzle, isCor
 }
 
 func (s *DeepSeekService) chat(systemPrompt, userMessage string) (string, error) {
+	return s.chatWithHistory(systemPrompt, userMessage, nil)
+}
+
+// ChatWithHistory 支持多轮对话历史的聊天接口
+func (s *DeepSeekService) ChatWithHistory(sgf, question string, history []HistoryMessage) (string, error) {
+	systemPrompt := `你是一位资深围棋老师，正在和学生面对面复盘。我会给你完整的 SGF 棋谱。请像真人一样自然说话，简洁、有画面感。不要长篇大论，除非学生要求详细说。不要套模板，像微信聊天一样自由回答。`
+	userMessage := fmt.Sprintf("【SGF 棋谱】\n%s\n\n【学生问题】\n%s", sgf, question)
+	return s.chatWithHistory(systemPrompt, userMessage, history)
+}
+
+// HistoryMessage 历史消息
+type HistoryMessage struct {
+	Role    string `json:"role"`
+	Content string `json:"content"`
+}
+
+func (s *DeepSeekService) chatWithHistory(systemPrompt, userMessage string, history []HistoryMessage) (string, error) {
 	if s.apiKey == "" {
 		return s.mockResponse(userMessage), nil
 	}
 
+	messages := []deepseekMessage{
+		{Role: "system", Content: systemPrompt},
+	}
+	for _, h := range history {
+		messages = append(messages, deepseekMessage{Role: h.Role, Content: h.Content})
+	}
+	messages = append(messages, deepseekMessage{Role: "user", Content: userMessage})
+
 	reqBody := deepseekRequest{
-		Model:  "deepseek-chat",
-		Stream: false,
-		Messages: []deepseekMessage{
-			{Role: "system", Content: systemPrompt},
-			{Role: "user", Content: userMessage},
-		},
+		Model:    "deepseek-chat",
+		Stream:   false,
+		Messages: messages,
 	}
 
 	bodyBytes, err := json.Marshal(reqBody)

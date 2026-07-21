@@ -56,6 +56,9 @@ func main() {
 			games.POST("/summary", gameHandler.GameSummary)
 		}
 
+		// AI 聊天接口（微信式 AI 老师面板用）
+		api.POST("/chat", gameHandler.Chat)
+
 		// KataGo 直连接口
 		game := api.Group("/game")
 		{

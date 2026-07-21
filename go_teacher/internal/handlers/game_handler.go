@@ -260,6 +260,28 @@ func (h *GameHandler) AskQuestion(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"answer": answer})
 }
 
+// chatRequest 带历史记录的聊天请求
+type chatRequest struct {
+	SGF      string                `json:"sgf"`
+	Question string                `json:"question"`
+	History  []services.HistoryMessage `json:"history"`
+}
+
+// Chat 带历史记录的 AI 聊天接口（微信式 AI 老师面板用）
+func (h *GameHandler) Chat(c *gin.Context) {
+	var req chatRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	answer, err := h.deepseekService.ChatWithHistory(req.SGF, req.Question, req.History)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"answer": answer})
+}
+
 func (h *GameHandler) GetSGF(c *gin.Context) {
 	gameID := c.Param("id")
 	game, ok := h.gameService.GetGame(gameID)

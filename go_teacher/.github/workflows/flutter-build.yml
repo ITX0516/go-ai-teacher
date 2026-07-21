@@ -1,0 +1,41 @@
+name: Flutter Build APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.25.3'
+          channel: 'stable'
+          cache: false
+
+      - name: Install dependencies
+        run: |
+          cd go_teacher_flutter
+          flutter pub get
+
+      - name: Build APK (ARM64 only)
+        run: |
+          cd go_teacher_flutter
+          flutter build apk --release --target-platform android-arm64
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-apk-arm64
+          path: go_teacher_flutter/build/app/outputs/flutter-apk/app-release.apk

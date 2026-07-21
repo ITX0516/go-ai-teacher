@@ -5,18 +5,26 @@ import '../models/analysis_data.dart';
 import 'game_service.dart';
 
 class ApiService implements GameService {
-  final String baseUrl;
+  String _baseUrl;
   final http.Client _client;
 
-  // TODO: 联调时修改此地址为你的电脑IP，如 'http://192.168.1.105:8080'
-  // 当前为 localhost，仅本地模拟器可用
-  ApiService({this.baseUrl = 'http://192.168.1.25:8080'}) : _client = http.Client();
+  static const String _defaultBaseUrl = 'http://192.168.1.25:8080';
 
-  factory ApiService.withClient(http.Client client, {String baseUrl = 'http://192.168.1.25:8080'}) {
-    return ApiService._internal(baseUrl, client);
+  String get baseUrl => _baseUrl;
+
+  ApiService({String? baseUrl})
+      : _baseUrl = baseUrl ?? _defaultBaseUrl,
+        _client = http.Client();
+
+  factory ApiService.withClient(http.Client client, {String? baseUrl}) {
+    return ApiService._internal(baseUrl ?? _defaultBaseUrl, client);
   }
 
-  ApiService._internal(this.baseUrl, this._client);
+  ApiService._internal(this._baseUrl, this._client);
+
+  void updateBaseUrl(String newUrl) {
+    _baseUrl = newUrl;
+  }
 
   Future<GameState> newGame(String gameId, {int boardSize = 19, double komi = 6.5}) async {
     final response = await _client.post(

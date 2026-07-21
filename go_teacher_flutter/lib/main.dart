@@ -2,23 +2,35 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'services/game_service.dart';
 import 'services/api_service.dart';
+import 'services/config_service.dart';
 import 'pages/home_page.dart';
 import 'pages/play_page.dart';
 import 'pages/puzzles_page.dart';
 import 'pages/review_page.dart';
 import 'pages/courses_page.dart';
+import 'pages/settings_page.dart';
 
-void main() {
-  runApp(const MyApp());
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final configService = ConfigService();
+  await configService.init();
+  runApp(MyApp(configService: configService));
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  final ConfigService configService;
+
+  const MyApp({super.key, required this.configService});
 
   @override
   Widget build(BuildContext context) {
-    return Provider<GameService>(
-      create: (_) => ApiService(),
+    return MultiProvider(
+      providers: [
+        Provider<ConfigService>.value(value: configService),
+        Provider<GameService>(
+          create: (_) => ApiService(baseUrl: configService.baseUrl),
+        ),
+      ],
       child: MaterialApp(
         title: '围棋AI老师',
         debugShowCheckedModeBanner: false,
@@ -36,6 +48,7 @@ class MyApp extends StatelessWidget {
           '/puzzles': (_) => const PuzzlesPage(),
           '/review': (_) => const ReviewPage(),
           '/courses': (_) => const CoursesPage(),
+          '/settings': (_) => const SettingsPage(),
         },
       ),
     );

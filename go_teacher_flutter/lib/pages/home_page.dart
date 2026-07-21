@@ -94,6 +94,13 @@ class HomePage extends StatelessWidget {
             ],
           ),
         ),
+        const SizedBox(width: 12),
+        IconButton(
+          icon: const Icon(Icons.settings, color: Color(0xFF718096)),
+          onPressed: () {
+            Navigator.pushNamed(context, '/settings');
+          },
+        ),
       ],
     );
   }

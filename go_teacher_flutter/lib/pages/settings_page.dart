@@ -73,13 +73,24 @@ class _SettingsPageState extends State<SettingsPage> {
     final configService = Provider.of<ConfigService>(context, listen: false);
     await configService.resetToDefault();
     _urlController.text = configService.baseUrl;
+    setState(() {});
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('已恢复默认配置')),
     );
   }
 
+  Future<void> _toggleMode(bool value) async {
+    final configService = Provider.of<ConfigService>(context, listen: false);
+    await configService.setOfflineMode(value);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(value ? '已切换到离线模式' : '已切换到连接本地后端模式，重启应用生效')),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final configService = Provider.of<ConfigService>(context);
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('设置'),
@@ -89,23 +100,33 @@ class _SettingsPageState extends State<SettingsPage> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          const Card(
+          Card(
             child: Padding(
-              padding: EdgeInsets.all(16),
+              padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    '网络配置说明',
+                  const Text(
+                    '运行模式',
                     style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                   ),
-                  SizedBox(height: 8),
-                  Text(
-                    '• 同一局域网：输入电脑的局域网IP，如 http://192.168.1.25:8080\n'
-                    '• 异地访问：需要配置路由器端口映射和DDNS\n'
-                    '• 默认端口：8080',
-                    style: TextStyle(color: Colors.grey, fontSize: 14),
+                  const SizedBox(height: 12),
+                  SwitchListTile(
+                    title: const Text('离线模式'),
+                    subtitle: const Text('使用内置Dart引擎，无需后端服务'),
+                    value: configService.isOfflineMode,
+                    onChanged: _toggleMode,
+                    activeColor: const Color(0xFF2D5016),
                   ),
+                  const SizedBox(height: 8),
+                  if (!configService.isOfflineMode)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 16),
+                      child: Text(
+                        '⚠️ 已切换到连接本地后端模式',
+                        style: TextStyle(color: Colors.orange[600], fontSize: 12),
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -120,6 +141,11 @@ class _SettingsPageState extends State<SettingsPage> {
                   const Text(
                     '后端服务地址',
                     style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    '在非离线模式下，手机需要与电脑连接同一WLAN',
+                    style: TextStyle(color: Colors.grey, fontSize: 12),
                   ),
                   const SizedBox(height: 12),
                   TextField(
@@ -186,16 +212,23 @@ class _SettingsPageState extends State<SettingsPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    '异地访问设置',
+                    '使用说明',
                     style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 8),
                   const Text(
-                    '1. 登录路由器管理后台\n'
-                    '2. 找到端口映射/虚拟服务器设置\n'
-                    '3. 添加规则：外部端口8080 → 内部IP:8080\n'
-                    '4. 注册DDNS服务（如花生壳）获取域名\n'
-                    '5. 在App中输入 http://你的域名:8080',
+                    '【离线模式】\n'
+                    '• 使用内置纯Dart围棋引擎\n'
+                    '• AI难度较低，但无需任何后端\n'
+                    '• 随时随地可用，无需网络\n\n'
+                    '【连接本地后端】\n'
+                    '• 使用电脑上的KataGo强AI\n'
+                    '• 分析更准确，AI水平更高\n'
+                    '• 需要手机与电脑连接同一WLAN\n'
+                    '• 需要在电脑上运行Go后端服务\n\n'
+                    '【如何获取电脑IP】\n'
+                    'Windows: cmd → ipconfig\n'
+                    'macOS/Linux: terminal → ifconfig 或 ip addr',
                     style: TextStyle(color: Colors.grey, fontSize: 14),
                   ),
                 ],

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'services/game_service.dart';
 import 'services/api_service.dart';
+import 'services/mock_api_service.dart';
 import 'services/config_service.dart';
 import 'pages/home_page.dart';
 import 'pages/play_page.dart';
@@ -28,7 +29,9 @@ class MyApp extends StatelessWidget {
       providers: [
         Provider<ConfigService>.value(value: configService),
         Provider<GameService>(
-          create: (_) => ApiService(baseUrl: configService.baseUrl),
+          create: (_) => configService.isOfflineMode
+              ? MockApiService()
+              : ApiService(baseUrl: configService.baseUrl),
         ),
       ],
       child: MaterialApp(

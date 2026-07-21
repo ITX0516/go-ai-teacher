@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/config_service.dart';
@@ -56,11 +57,12 @@ class _SettingsPageState extends State<SettingsPage> {
       return;
     }
     try {
-      final gameService = Provider.of<GameService>(context, listen: false);
-      await gameService.getGame('test');
+      final healthUrl = '$url/api/health';
+      final response = await HttpClient().getUrl(Uri.parse(healthUrl));
+      final httpResponse = await response.close();
       setState(() {
         _isTesting = false;
-        _testResult = '✓ 连接成功';
+        _testResult = httpResponse.statusCode == 200 ? '✓ 连接成功' : '✗ 连接失败: HTTP ${httpResponse.statusCode}';
       });
     } catch (e) {
       setState(() {

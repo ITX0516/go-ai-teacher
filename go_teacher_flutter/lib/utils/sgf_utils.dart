@@ -118,3 +118,34 @@ String movesToSgfString(int boardSize, double komi, List<MoveRecord> moves) {
   sb.write(')');
   return sb.toString();
 }
+
+/// GTP 字母表（跳过 I）
+const String _gtpLetters = 'ABCDEFGHJKLMNOPQRST';
+
+/// 把 SGF 棋谱字符串转成 GTP 格式的着法列表
+/// 例: "(;GM[1];B[dp];W[dc])" → "黑D4 白D16"
+/// SGF 坐标 a-s (不跳i, a=顶) → GTP 坐标 A-T (跳I, 1=底)
+String sgfToGTPMoves(String sgf) {
+  final regex = RegExp(r';(B|W)\[([a-s]{2})\]');
+  final matches = regex.allMatches(sgf);
+  if (matches.isEmpty) return sgf;
+
+  final parts = <String>[];
+  for (final m in matches) {
+    final color = m.group(1) == 'B' ? '黑' : '白';
+    final coord = m.group(2)!;
+    final sgfCol = coord.codeUnitAt(0) - 'a'.codeUnitAt(0);
+    final sgfRow = coord.codeUnitAt(1) - 'a'.codeUnitAt(0);
+
+    // SGF列 → GTP列：sgf 0-7 → 围棋 0-7(A-H), sgf 9-18 → 围棋 8-17(J-T)
+    var goCol = sgfCol;
+    if (sgfCol > 8) goCol = sgfCol - 1;
+    if (goCol > 18) goCol = 18;
+
+    // SGF行 a=顶(0) → GTP行号 19, s=底(18) → GTP行号 1
+    final gtpRow = 19 - sgfRow;
+
+    parts.add('$color${_gtpLetters[goCol]}$gtpRow');
+  }
+  return parts.join(' ');
+}

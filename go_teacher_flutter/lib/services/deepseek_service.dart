@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../utils/sgf_utils.dart';
 
 class DeepSeekService {
   final String apiKey;
@@ -111,7 +112,7 @@ class DeepSeekService {
   }) async {
     final sb = StringBuffer();
     if (gameSgf != null && gameSgf.isNotEmpty) {
-      sb.writeln(gameSgf);
+      sb.writeln(sgfToGTPMoves(gameSgf));
       sb.writeln();
     }
     final kataText = _kataGoToText(kataGoData);
@@ -131,7 +132,7 @@ class DeepSeekService {
   }) async {
     final sb = StringBuffer();
     if (gameSgf != null && gameSgf.isNotEmpty) {
-      sb.writeln(gameSgf);
+      sb.writeln(sgfToGTPMoves(gameSgf));
       sb.writeln();
     }
     final kataText = _kataGoToText(kataGoData);
@@ -146,7 +147,7 @@ class DeepSeekService {
   Future<String> gameSummary(String sgf, String result) async {
     final sb = StringBuffer();
     if (sgf.isNotEmpty) {
-      sb.writeln(sgf);
+      sb.writeln(sgfToGTPMoves(sgf));
       sb.writeln();
     }
     sb.writeln('本局结果：$result');

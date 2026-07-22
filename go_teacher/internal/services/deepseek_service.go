@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"regexp"
 	"strings"
 )
 
@@ -94,7 +95,7 @@ func (s *DeepSeekService) ExplainMove(move string, moveNumber int, winRateChange
 当前手数：第 %d 手
 轮到：%s
 
-【SGF 棋谱】
+【棋谱】
 %s
 
 %s
@@ -102,7 +103,7 @@ func (s *DeepSeekService) ExplainMove(move string, moveNumber int, winRateChange
 %s
 
 【用户问题】
-请分析第%d手 %s 的问题。`, moveNumber, analysis.CurrentTurn, gameSGF, areaText, analysisText, moveNumber, move)
+请分析第%d手 %s 的问题。`, moveNumber, analysis.CurrentTurn, sgfToGTPMoves(gameSGF), areaText, analysisText, moveNumber, move)
 
 	response, err := s.chat(systemPromptExplainMove, userPrompt)
 	if err != nil {
@@ -126,23 +127,23 @@ func (s *DeepSeekService) ExplainMove(move string, moveNumber int, winRateChange
 }
 
 func (s *DeepSeekService) ExplainPosition(gameSGF string, userQuestion string) (string, error) {
-	userPrompt := fmt.Sprintf(`当前棋局SGF棋谱：
+	userPrompt := fmt.Sprintf(`当前棋局：
 %s
 
 用户问题：%s
 
-请用通俗语言判断形势，指出双方要点。`, gameSGF, userQuestion)
+请用通俗语言判断形势，指出双方要点。`, sgfToGTPMoves(gameSGF), userQuestion)
 
 	return s.chat(systemPromptExplainPosition, userPrompt)
 }
 
 func (s *DeepSeekService) AnalyzeGameSummary(sgf string, result string) (string, error) {
-	userPrompt := fmt.Sprintf(`棋谱SGF：
+	userPrompt := fmt.Sprintf(`棋谱：
 %s
 
 结果：%s
 
-请做复盘总结：整体评价+3个亮点+2个改进点+鼓励。`, sgf, result)
+请做复盘总结：整体评价+3个亮点+2个改进点+鼓励。`, sgfToGTPMoves(sgf), result)
 
 	return s.chat(systemPromptAnalyzeSummary, userPrompt)
 }
@@ -183,12 +184,50 @@ type HistoryMessage struct {
 	Content string `json:"content"`
 }
 
+// sgfToGTPMoves 把 SGF 棋谱转成 GTP 格式的着法列表
+// 例: "(;GM[1]FF[4]SZ[19]KM[6.5];B[dp];W[dc])" → "黑D4 白D16"
+// SGF 坐标 a-s (不跳i, a=顶) → GTP 坐标 A-T (跳I, 1=底)
+var sgfMoveRe = regexp.MustCompile(`;(B|W)\[([a-s]{2})\]`)
+
+func sgfToGTPMoves(sgf string) string {
+	matches := sgfMoveRe.FindAllStringSubmatch(sgf, -1)
+	if len(matches) == 0 {
+		return sgf // 解析失败则返回原始 SGF
+	}
+	var parts []string
+	for _, m := range matches {
+		color := "黑"
+		if m[1] == "W" {
+			color = "白"
+		}
+		coord := m[2]
+		// SGF 列 a-s(不跳i) → GTP 列 A-T(跳I)
+		sgfCol := int(coord[0] - 'a')
+		sgfRow := int(coord[1] - 'a')
+		// SGF列 → 围棋列：sgf 0-7 → 围棋 0-7(A-H), sgf 9-18 → 围棋 8-17(J-T), sgf 8(i) 无对应
+		goCol := sgfCol
+		if sgfCol > 8 {
+			goCol = sgfCol - 1 // 跳过围棋的 I
+		}
+		if goCol > 18 {
+			goCol = 18
+		}
+		gtpLetters := "ABCDEFGHJKLMNOPQRST"
+		// SGF行 a=顶(0) → GTP行号 19-0=19, s=底(18) → GTP行号 19-18=1
+		gtpRow := 19 - sgfRow
+		parts = append(parts, fmt.Sprintf("%s%c%d", color, gtpLetters[goCol], gtpRow))
+	}
+	return strings.Join(parts, " ")
+}
+
 // ChatWithHistory 支持多轮对话历史 + KataGo 数据的聊天接口
 // Prompt 裸奔：System Prompt 留空让模型自由发挥
 func (s *DeepSeekService) ChatWithHistory(sgf, question string, history []HistoryMessage, kataGoData *KataGoChatData) (string, error) {
-	// 用户消息：直接拼接 SGF + KataGo 自然语言 + 问题，不要任何【】标签
+	// 把 SGF 棋谱转成 GTP 格式，避免 SGF 和 GTP 坐标混用导致 AI 混淆
+	gtpMoves := sgfToGTPMoves(sgf)
+
 	var sb bytes.Buffer
-	sb.WriteString(sgf)
+	sb.WriteString(gtpMoves)
 	sb.WriteString("\n\n")
 
 	if kataGoData != nil {

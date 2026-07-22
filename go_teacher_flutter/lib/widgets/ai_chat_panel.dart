@@ -9,7 +9,7 @@ import 'chat_bubble.dart';
 class AiChatPanel extends StatefulWidget {
   final String gameId;
   final String Function() getSgf;
-  final Map<String, dynamic> Function()? getKataGoData;
+  final Map<String, dynamic>? Function()? getKataGoData;
 
   const AiChatPanel({
     super.key,

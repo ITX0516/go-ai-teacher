@@ -40,9 +40,8 @@ abstract class GameService {
     String gameId,
     String sgf,
     String question,
-    List<Map<String, String>> history, {
-    Map<String, dynamic>? kataGoData,
-  });
+    List<Map<String, String>> history,
+  );
 
   Future<List<Puzzle>> getPuzzles({String? category, String? difficulty});
   Future<Puzzle> getPuzzle(String id);

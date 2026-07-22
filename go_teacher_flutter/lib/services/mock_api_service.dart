@@ -204,12 +204,11 @@ class MockApiService implements GameService {
     String gameId,
     String sgf,
     String question,
-    List<Map<String, String>> history, {
-    Map<String, dynamic>? kataGoData,
-  }) async {
+    List<Map<String, String>> history,
+  ) async {
     if (_deepSeek != null) {
       try {
-        return await _deepSeek!.askQuestion(question, sgf, kataGoData: kataGoData);
+        return await _deepSeek!.askQuestion(question, sgf);
       } catch (e) {
         // Fall through to mock
       }
@@ -316,7 +315,7 @@ class MockApiService implements GameService {
 继续努力，棋力一定会更上一层楼！ 🔥''';
   }
 
-  Future<AnalysisData> analyzeGame(List<MoveRecord> moves, int boardSize, int color) async {
+  Future<AnalysisData> analyzeGame(String gameId, List<MoveRecord> moves, int boardSize, int color) async {
     await Future.delayed(const Duration(milliseconds: 300));
 
     final winrate = 0.45 + _rand.nextDouble() * 0.15;

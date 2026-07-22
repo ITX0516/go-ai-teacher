@@ -48,5 +48,5 @@ abstract class GameService {
   Future<Puzzle> getPuzzle(String id);
   Future<Map<String, dynamic>> checkPuzzleAnswer(String id, String move);
   Future<String> gameSummary(String sgf, String result);
-  Future<AnalysisData> analyzeGame(List<MoveRecord> moves, int boardSize, int color);
+  Future<AnalysisData> analyzeGame(String gameId, List<MoveRecord> moves, int boardSize, int color);
 }

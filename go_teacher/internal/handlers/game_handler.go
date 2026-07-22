@@ -15,13 +15,15 @@ type GameHandler struct {
 	gameService     *services.GameService
 	kataGoService   *services.KataGoService
 	deepseekService *services.DeepSeekService
+	kataGoCache     map[string]*services.KataGoChatData
 }
 
 func NewGameHandler(gs *services.GameService, ks *services.KataGoService, deepseek *services.DeepSeekService) *GameHandler {
 	return &GameHandler{
-		gameService:   gs,
-		kataGoService: ks,
-		deepseekService:   deepseek,
+		gameService:     gs,
+		kataGoService:   ks,
+		deepseekService: deepseek,
+		kataGoCache:     make(map[string]*services.KataGoChatData),
 	}
 }
 
@@ -262,10 +264,10 @@ func (h *GameHandler) AskQuestion(c *gin.Context) {
 
 // chatRequest 带历史记录的聊天请求
 type chatRequest struct {
-	SGF         string                  `json:"sgf"`
-	Question    string                  `json:"question"`
-	History     []services.HistoryMessage `json:"history"`
-	KataGoData  *services.KataGoChatData  `json:"kataGoData,omitempty"`
+	GameID   string                  `json:"game_id"`
+	SGF      string                  `json:"sgf"`
+	Question string                  `json:"question"`
+	History  []services.HistoryMessage `json:"history"`
 }
 
 // Chat 带历史记录的 AI 聊天接口（微信式 AI 老师面板用）
@@ -276,16 +278,22 @@ func (h *GameHandler) Chat(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	log.Printf("[Chat] sgf_len=%d question=%q history_len=%d kataGoData=%v",
-		len(req.SGF), req.Question, len(req.History), req.KataGoData != nil)
-	if req.KataGoData != nil {
-		log.Printf("[Chat] kataGo: move=%d wr=%.3f wrChg=%.3f best=%s score=%.1f player=%s candidates=%d",
-			req.KataGoData.MoveNumber, req.KataGoData.Winrate,
-			req.KataGoData.WinrateChange, req.KataGoData.BestMove,
-			req.KataGoData.ScoreLead, req.KataGoData.CurrentPlayer,
-			len(req.KataGoData.CandidateMoves))
+
+	var kataGoData *services.KataGoChatData
+	if req.GameID != "" {
+		kataGoData = h.kataGoCache[req.GameID]
 	}
-	answer, err := h.deepseekService.ChatWithHistory(req.SGF, req.Question, req.History, req.KataGoData)
+
+	log.Printf("[Chat] gameId=%s sgf_len=%d question=%q history_len=%d kataGoData=%v",
+		req.GameID, len(req.SGF), req.Question, len(req.History), kataGoData != nil)
+	if kataGoData != nil {
+		log.Printf("[Chat] kataGo: move=%d wr=%.3f best=%s score=%.1f player=%s candidates=%d",
+			kataGoData.MoveNumber, kataGoData.Winrate,
+			kataGoData.BestMove, kataGoData.ScoreLead,
+			kataGoData.CurrentPlayer, len(kataGoData.CandidateMoves))
+	}
+
+	answer, err := h.deepseekService.ChatWithHistory(req.SGF, req.Question, req.History, kataGoData)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -328,6 +336,7 @@ func (h *GameHandler) GameSummary(c *gin.Context) {
 // ===== 新增 KataGo 直连接口 =====
 
 type analyzeRequest struct {
+	GameID    string               `json:"game_id"`
 	Moves     []services.MoveInput `json:"moves"`
 	BoardSize int                  `json:"board_size"`
 	Color     int                  `json:"color"` // 1=黑, 2=白
@@ -351,6 +360,32 @@ func (h *GameHandler) AnalyzeSGF(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+
+	if req.GameID != "" {
+		maxCandidates := len(result.CandidateMoves)
+		if maxCandidates > 3 {
+			maxCandidates = 3
+		}
+		candidates := make([]struct {
+			Move    string  `json:"move"`
+			Winrate float64 `json:"winrate"`
+		}, maxCandidates)
+		for i := 0; i < maxCandidates; i++ {
+			candidates[i].Move = result.CandidateMoves[i].Move
+			candidates[i].Winrate = result.CandidateMoves[i].Winrate
+		}
+		h.kataGoCache[req.GameID] = &services.KataGoChatData{
+			MoveNumber:    len(req.Moves),
+			Winrate:       result.Winrate,
+			BestMove:      result.BestMove,
+			ScoreLead:     result.ScoreLead,
+			CurrentPlayer: map[int]string{1: "black", 2: "white"}[req.Color],
+			CandidateMoves: candidates,
+		}
+		log.Printf("[KataGo] 缓存分析结果: gameId=%s move=%d wr=%.3f best=%s",
+			req.GameID, len(req.Moves), result.Winrate, result.BestMove)
+	}
+
 	c.JSON(http.StatusOK, result)
 }
 

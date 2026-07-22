@@ -163,6 +163,7 @@ class _PlayPageState extends State<PlayPage> {
     try {
       final api = context.read<GameService>();
       final analysisData = await api.analyzeGame(
+        _gameId,
         _gameState!.moves,
         _gameState!.boardSize,
         _gameState!.currentPlayer,
@@ -727,34 +728,9 @@ class _PlayPageState extends State<PlayPage> {
             playerBlack: '玩家',
             playerWhite: 'AI老师',
           ),
-          getKataGoData: () => _buildKataGoPayload(),
         ),
       ),
     );
-  }
-
-  /// 把当前 KataGo 分析结果打包成后端需要的字段
-  /// 后端字段：moveNumber, winrate, winrateChange, bestMove, scoreLead, currentPlayer, candidateMoves
-  /// 如果没有 KataGo 数据返回 null（不传 kataGoData 字段）
-  Map<String, dynamic>? _buildKataGoPayload() {
-    final k = _katagoAnalysis;
-    final gs = _gameState;
-    if (k == null) return null;
-    final moveNumber = gs?.moves.length ?? 0;
-    final currentPlayer = gs != null
-        ? (gs.currentPlayer == 1 ? 'black' : 'white')
-        : 'black';
-    return <String, dynamic>{
-      'moveNumber': moveNumber,
-      'winrate': k.winrate,
-      'bestMove': k.bestMove,
-      'scoreLead': k.scoreLead,
-      'currentPlayer': currentPlayer,
-      'candidateMoves': k.candidateMoves.map((c) => {
-            'move': c.move,
-            'winrate': c.winrate,
-          }).toList(),
-    };
   }
 
   Widget _buildAnalysisSection() {

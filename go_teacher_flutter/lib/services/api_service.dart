@@ -210,17 +210,14 @@ class ApiService implements GameService {
     String gameId,
     String sgf,
     String question,
-    List<Map<String, String>> history, {
-    Map<String, dynamic>? kataGoData,
-  }) async {
+    List<Map<String, String>> history,
+  ) async {
     final body = <String, dynamic>{
+      'game_id': gameId,
       'sgf': sgf,
       'question': question,
       'history': history,
     };
-    if (kataGoData != null) {
-      body['kataGoData'] = kataGoData;
-    }
     final response = await _client.post(
       Uri.parse('$baseUrl/api/chat'),
       headers: {'Content-Type': 'application/json'},
@@ -280,11 +277,12 @@ class ApiService implements GameService {
     throw Exception('Failed to get summary');
   }
 
-  Future<AnalysisData> analyzeGame(List<MoveRecord> moves, int boardSize, int color) async {
+  Future<AnalysisData> analyzeGame(String gameId, List<MoveRecord> moves, int boardSize, int color) async {
     final response = await _client.post(
       Uri.parse('$baseUrl/api/game/analyze'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
+        'game_id': gameId,
         'moves': moves.map((m) => m.toJson()).toList(),
         'board_size': boardSize,
         'color': color,

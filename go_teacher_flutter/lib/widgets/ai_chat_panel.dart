@@ -9,13 +9,11 @@ import 'chat_bubble.dart';
 class AiChatPanel extends StatefulWidget {
   final String gameId;
   final String Function() getSgf;
-  final Map<String, dynamic>? Function()? getKataGoData;
 
   const AiChatPanel({
     super.key,
     required this.gameId,
     required this.getSgf,
-    this.getKataGoData,
   });
 
   @override
@@ -67,14 +65,12 @@ class _AiChatPanelState extends State<AiChatPanel> {
       final api = context.read<GameService>();
       final sgf = widget.getSgf();
       final history = chatService.getHistory();
-      final kataGoData = widget.getKataGoData?.call();
 
       final answer = await api.chatWithHistory(
         widget.gameId,
         sgf,
         text,
         history,
-        kataGoData: kataGoData,
       );
       chatService.addAssistantMessage(answer);
     } catch (e) {

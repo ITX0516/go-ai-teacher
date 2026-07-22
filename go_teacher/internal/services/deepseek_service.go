@@ -7,6 +7,7 @@ import (
 	"go_teacher/internal/models"
 	"io"
 	"net/http"
+	"strings"
 )
 
 const systemPromptExplainMove = `你是一位资深围棋老师，正在和学生面对面复盘。我会给你完整的 SGF 棋谱。请像真人一样自然说话，简洁、有画面感。不要长篇大论，除非学生要求详细说。不要套模板，像微信聊天一样自由回答。`
@@ -35,9 +36,11 @@ type deepseekMessage struct {
 }
 
 type deepseekRequest struct {
-	Model    string        `json:"model"`
-	Messages []deepseekMessage `json:"messages"`
-	Stream   bool          `json:"stream"`
+	Model       string             `json:"model"`
+	Messages    []deepseekMessage  `json:"messages"`
+	Stream      bool               `json:"stream"`
+	Temperature float64            `json:"temperature,omitempty"`
+	MaxTokens   int                `json:"max_tokens,omitempty"`
 }
 
 type deepseekResponse struct {
@@ -159,30 +162,106 @@ func (s *DeepSeekService) GeneratePuzzleExplanation(puzzle *models.Puzzle, isCor
 	return s.chat(systemPrompt, userPrompt)
 }
 
-func (s *DeepSeekService) chat(systemPrompt, userMessage string) (string, error) {
-	return s.chatWithHistory(systemPrompt, userMessage, nil)
+// KataGoChatData KataGo 数据传递给 DeepSeek（用于自然语言化）
+type KataGoChatData struct {
+	MoveNumber     int     `json:"moveNumber"`
+	Winrate        float64 `json:"winrate"`         // 0~1
+	WinrateChange  float64 `json:"winrateChange"`   // 0~1
+	BestMove       string  `json:"bestMove"`        // 如 "D4"
+	ScoreLead      float64 `json:"scoreLead"`       // 正数 = 黑领先，负数 = 白领先
+	CurrentPlayer  string  `json:"currentPlayer"`   // "black" | "white"
+	CandidateMoves []struct {
+		Move    string  `json:"move"`
+		Winrate float64 `json:"winrate"`
+	} `json:"candidateMoves,omitempty"`
 }
 
-// ChatWithHistory 支持多轮对话历史的聊天接口
-func (s *DeepSeekService) ChatWithHistory(sgf, question string, history []HistoryMessage) (string, error) {
-	systemPrompt := `你是一位资深围棋老师，正在和学生面对面复盘。我会给你完整的 SGF 棋谱。请像真人一样自然说话，简洁、有画面感。不要长篇大论，除非学生要求详细说。不要套模板，像微信聊天一样自由回答。`
-	userMessage := fmt.Sprintf("【SGF 棋谱】\n%s\n\n【学生问题】\n%s", sgf, question)
-	return s.chatWithHistory(systemPrompt, userMessage, history)
-}
-
-// HistoryMessage 历史消息
+// HistoryMessage 多轮对话历史
 type HistoryMessage struct {
 	Role    string `json:"role"`
 	Content string `json:"content"`
 }
 
+// ChatWithHistory 支持多轮对话历史 + KataGo 数据的聊天接口
+// Prompt 裸奔：System Prompt 留空让模型自由发挥
+func (s *DeepSeekService) ChatWithHistory(sgf, question string, history []HistoryMessage, kataGoData *KataGoChatData) (string, error) {
+	// 用户消息：直接拼接 SGF + KataGo 自然语言 + 问题，不要任何【】标签
+	var sb bytes.Buffer
+	sb.WriteString(sgf)
+	sb.WriteString("\n\n")
+
+	if kataGoData != nil {
+		sb.WriteString(kataGoDataToNaturalLanguage(kataGoData))
+		sb.WriteString("\n\n")
+	}
+
+	sb.WriteString(question)
+
+	return s.chatWithRawPrompt("", sb.String(), history)
+}
+
+// kataGoDataToNaturalLanguage 把 KataGo 数据转为自然语言
+func kataGoDataToNaturalLanguage(d *KataGoChatData) string {
+	var sb strings.Builder
+
+	// 胜率
+	if d.Winrate > 0 {
+		blackWR := d.Winrate * 100
+		whiteWR := 100 - blackWR
+		fmt.Fprintf(&sb, "胜率：黑%.0f%% 白%.0f%%\n", blackWR, whiteWR)
+	}
+
+	// 胜率变化
+	if d.WinrateChange != 0 {
+		fmt.Fprintf(&sb, "这手导致胜率变化：%+.0f%%\n", d.WinrateChange*100)
+	}
+
+	// AI推荐下一手
+	if d.BestMove != "" {
+		fmt.Fprintf(&sb, "AI推荐：D%s\n", d.BestMove)
+	}
+
+	// 目差
+	if d.ScoreLead != 0 {
+		if d.ScoreLead > 0 {
+			fmt.Fprintf(&sb, "目差：黑领先%.1f目\n", d.ScoreLead)
+		} else {
+			fmt.Fprintf(&sb, "目差：白领先%.1f目\n", -d.ScoreLead)
+		}
+	}
+
+	// 候选点
+	if len(d.CandidateMoves) > 0 {
+		sb.WriteString("候选点：")
+		for i, cm := range d.CandidateMoves {
+			if i >= 3 {
+				break
+			}
+			fmt.Fprintf(&sb, "D%s(%.0f%%) ", cm.Move, cm.Winrate*100)
+		}
+		sb.WriteString("\n")
+	}
+
+	return strings.TrimRight(sb.String(), "\n")
+}
+
+func (s *DeepSeekService) chat(systemPrompt, userMessage string) (string, error) {
+	return s.chatWithHistory(systemPrompt, userMessage, nil)
+}
+
 func (s *DeepSeekService) chatWithHistory(systemPrompt, userMessage string, history []HistoryMessage) (string, error) {
+	return s.chatWithRawPrompt(systemPrompt, userMessage, history)
+}
+
+// chatWithRawPrompt 底层调用 DeepSeek API，温度 0.9，max_tokens 2000
+func (s *DeepSeekService) chatWithRawPrompt(systemPrompt, userMessage string, history []HistoryMessage) (string, error) {
 	if s.apiKey == "" {
 		return s.mockResponse(userMessage), nil
 	}
 
-	messages := []deepseekMessage{
-		{Role: "system", Content: systemPrompt},
+	messages := []deepseekMessage{}
+	if systemPrompt != "" {
+		messages = append(messages, deepseekMessage{Role: "system", Content: systemPrompt})
 	}
 	for _, h := range history {
 		messages = append(messages, deepseekMessage{Role: h.Role, Content: h.Content})
@@ -190,9 +269,11 @@ func (s *DeepSeekService) chatWithHistory(systemPrompt, userMessage string, hist
 	messages = append(messages, deepseekMessage{Role: "user", Content: userMessage})
 
 	reqBody := deepseekRequest{
-		Model:    "deepseek-chat",
-		Stream:   false,
-		Messages: messages,
+		Model:       "deepseek-chat",
+		Stream:      false,
+		Messages:    messages,
+		Temperature: 0.9,
+		MaxTokens:   2000,
 	}
 
 	bodyBytes, err := json.Marshal(reqBody)

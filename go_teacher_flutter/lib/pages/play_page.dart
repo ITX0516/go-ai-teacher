@@ -727,9 +727,34 @@ class _PlayPageState extends State<PlayPage> {
             playerBlack: '玩家',
             playerWhite: 'AI老师',
           ),
+          getKataGoData: () => _buildKataGoPayload(),
         ),
       ),
     );
+  }
+
+  /// 把当前 KataGo 分析结果打包成后端需要的字段
+  /// 后端字段：moveNumber, winrate, winrateChange, bestMove, scoreLead, currentPlayer, candidateMoves
+  Map<String, dynamic> _buildKataGoPayload() {
+    final k = _katagoAnalysis;
+    final gs = _gameState;
+    if (k == null) return const <String, dynamic>{};
+    final moveNumber = gs?.moves.length ?? 0;
+    final currentPlayer = gs != null
+        ? (gs.currentPlayer == 1 ? 'black' : 'white')
+        : 'black';
+    return <String, dynamic>{
+      'moveNumber': moveNumber,
+      'winrate': k.winrate,
+      // winrateChange 暂存前一手 - 当前手胜率差（如有）
+      'bestMove': k.bestMove,
+      'scoreLead': k.scoreLead,
+      'currentPlayer': currentPlayer,
+      'candidateMoves': k.candidateMoves.map((c) => {
+            'move': c.move,
+            'winrate': c.winrate,
+          }).toList(),
+    };
   }
 
   Widget _buildAnalysisSection() {

@@ -1,4 +1,5 @@
 import '../models/game_models.dart';
+import 'sgf_utils.dart';
 
 /// 解析 SGF 字符串为 GameState
 /// 支持 SZ（棋盘大小）、B/W（手顺）、AB/AW（初始摆子）、C（注释）
@@ -44,13 +45,13 @@ GameState sgfToGame(String sgf) {
   // 解析 AB（黑子初始摆子）和 AW（白子初始摆子）
   if (rootAttrs.containsKey('AB')) {
     for (final coord in rootAttrs['AB']!) {
-      final (x, y) = _sgfToCoord(coord, boardSize);
+      final (x, y) = sgfToCoord(coord, boardSize);
       initialStones.add(MoveRecord(x: x, y: y, color: GoStone.black, move: _coordToGtp(x, y, boardSize)));
     }
   }
   if (rootAttrs.containsKey('AW')) {
     for (final coord in rootAttrs['AW']!) {
-      final (x, y) = _sgfToCoord(coord, boardSize);
+      final (x, y) = sgfToCoord(coord, boardSize);
       initialStones.add(MoveRecord(x: x, y: y, color: GoStone.white, move: _coordToGtp(x, y, boardSize)));
     }
   }
@@ -69,7 +70,7 @@ GameState sgfToGame(String sgf) {
         // pass
         moves.add(MoveRecord(x: -1, y: -1, color: color, move: 'pass'));
       } else {
-        final (x, y) = _sgfToCoord(propValue, boardSize);
+        final (x, y) = sgfToCoord(propValue, boardSize);
         moves.add(MoveRecord(
           x: x,
           y: y,
@@ -128,16 +129,6 @@ Map<String, List<String>> _parseProperties(String props) {
   }
 
   return result;
-}
-
-/// SGF 坐标转 x, y
-(int, int) _sgfToCoord(String coord, int boardSize) {
-  if (coord.length < 2) {
-    return (-1, -1);
-  }
-  final x = coord.codeUnitAt(0) - 'a'.codeUnitAt(0);
-  final y = coord.codeUnitAt(1) - 'a'.codeUnitAt(0);
-  return (x, y);
 }
 
 /// SGF 坐标转 GTP 显示坐标（如 qd）

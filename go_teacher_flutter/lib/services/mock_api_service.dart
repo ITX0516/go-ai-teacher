@@ -204,11 +204,12 @@ class MockApiService implements GameService {
     String gameId,
     String sgf,
     String question,
-    List<Map<String, String>> history,
-  ) async {
+    List<Map<String, String>> history, {
+    Map<String, dynamic>? kataGoData,
+  }) async {
     if (_deepSeek != null) {
       try {
-        return await _deepSeek!.askQuestion(question, sgf);
+        return await _deepSeek!.askQuestion(question, sgf, kataGoData: kataGoData);
       } catch (e) {
         // Fall through to mock
       }

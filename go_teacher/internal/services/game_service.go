@@ -83,13 +83,28 @@ func (s *GameService) GameToSGF(game *models.GameState) string {
 	return sgf
 }
 
+// sgfLetters sgf 字母表（OGS / SGF FF4 标准）：a..s 不跳 i，共 19 个字母
+var sgfLetters = []rune{'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's'}
+
+// moveToSGF 将棋盘坐标 (x, y) 转为 SGF 坐标字符串
+// 棋盘 x 是列（0=left=A），y 是行（0=顶行=围棋行 1 from 顶）
+// 围棋行号 1-based from 底 = boardSize - y
+// sgf 字母表 a..s 不跳 i，索引 0..18
+// 围棋列 A..T 跳 I：J..T 跳过 sgf 的 'i'，列索引 +1
+//   例外：T 列（索引 18）→ sgf 索引 18='s'（不 +1）
 func moveToSGF(x, y, size int) string {
 	if x < 0 || y < 0 {
 		return "tt"
 	}
-	letterX := rune('a' + x)
-	letterY := rune('a' + y)
-	return string([]rune{letterX, letterY})
+	sgfCol := x
+	if x >= 8 && x < 18 {
+		sgfCol++ // 跳 sgf 'i'
+	}
+	if sgfCol >= len(sgfLetters) {
+		sgfCol = len(sgfLetters) - 1
+	}
+	sgfRowIdx := y
+	return string([]rune{sgfLetters[sgfCol], sgfLetters[sgfRowIdx]})
 }
 
 type JSONGameState struct {

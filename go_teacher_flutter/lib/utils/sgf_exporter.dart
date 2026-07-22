@@ -1,4 +1,5 @@
 import '../models/game_models.dart';
+import 'sgf_utils.dart';
 
 /// 将 GameState 导出为 SGF 格式字符串
 /// SGF 坐标规则：列 a-s（小写，不跳 I），行 a-s（0=顶部）
@@ -41,7 +42,7 @@ String gameToSgf(GameState state, {
   for (int i = 0; i < state.moves.length; i++) {
     final move = state.moves[i];
     final color = move.color == GoStone.black ? 'B' : 'W';
-    final coord = _coordToSgf(move.x, move.y, state.boardSize);
+    final coord = coordToSgf(move.x, move.y, state.boardSize);
     sb.write(';$color[$coord]');
   }
 
@@ -88,16 +89,4 @@ String generateSgfResult(EndGameType endGameType, String winner, [double? margin
       }
       return '${winner == 'black' ? 'B' : 'W'}+';
   }
-}
-
-/// 将坐标转为 SGF 坐标（2个小写字母）
-String _coordToSgf(int x, int y, int boardSize) {
-  // pass
-  if (x < 0 || y < 0) {
-    return 'tt';
-  }
-  // SGF: a=0, b=1, ..., s=18 (不跳 I)
-  final sx = String.fromCharCode('a'.codeUnitAt(0) + x);
-  final sy = String.fromCharCode('a'.codeUnitAt(0) + y);
-  return '$sx$sy';
 }

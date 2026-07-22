@@ -210,16 +210,21 @@ class ApiService implements GameService {
     String gameId,
     String sgf,
     String question,
-    List<Map<String, String>> history,
-  ) async {
+    List<Map<String, String>> history, {
+    Map<String, dynamic>? kataGoData,
+  }) async {
+    final body = <String, dynamic>{
+      'sgf': sgf,
+      'question': question,
+      'history': history,
+    };
+    if (kataGoData != null) {
+      body['kataGoData'] = kataGoData;
+    }
     final response = await _client.post(
       Uri.parse('$baseUrl/api/chat'),
       headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'sgf': sgf,
-        'question': question,
-        'history': history,
-      }),
+      body: jsonEncode(body),
     );
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);

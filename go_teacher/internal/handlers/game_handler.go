@@ -276,6 +276,15 @@ func (h *GameHandler) Chat(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	log.Printf("[Chat] sgf_len=%d question=%q history_len=%d kataGoData=%v",
+		len(req.SGF), req.Question, len(req.History), req.KataGoData != nil)
+	if req.KataGoData != nil {
+		log.Printf("[Chat] kataGo: move=%d wr=%.3f wrChg=%.3f best=%s score=%.1f player=%s candidates=%d",
+			req.KataGoData.MoveNumber, req.KataGoData.Winrate,
+			req.KataGoData.WinrateChange, req.KataGoData.BestMove,
+			req.KataGoData.ScoreLead, req.KataGoData.CurrentPlayer,
+			len(req.KataGoData.CandidateMoves))
+	}
 	answer, err := h.deepseekService.ChatWithHistory(req.SGF, req.Question, req.History, req.KataGoData)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})

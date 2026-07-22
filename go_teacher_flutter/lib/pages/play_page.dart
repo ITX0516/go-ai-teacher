@@ -735,10 +735,11 @@ class _PlayPageState extends State<PlayPage> {
 
   /// 把当前 KataGo 分析结果打包成后端需要的字段
   /// 后端字段：moveNumber, winrate, winrateChange, bestMove, scoreLead, currentPlayer, candidateMoves
-  Map<String, dynamic> _buildKataGoPayload() {
+  /// 如果没有 KataGo 数据返回 null（不传 kataGoData 字段）
+  Map<String, dynamic>? _buildKataGoPayload() {
     final k = _katagoAnalysis;
     final gs = _gameState;
-    if (k == null) return const <String, dynamic>{};
+    if (k == null) return null;
     final moveNumber = gs?.moves.length ?? 0;
     final currentPlayer = gs != null
         ? (gs.currentPlayer == 1 ? 'black' : 'white')
@@ -746,7 +747,6 @@ class _PlayPageState extends State<PlayPage> {
     return <String, dynamic>{
       'moveNumber': moveNumber,
       'winrate': k.winrate,
-      // winrateChange 暂存前一手 - 当前手胜率差（如有）
       'bestMove': k.bestMove,
       'scoreLead': k.scoreLead,
       'currentPlayer': currentPlayer,

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"go_teacher/internal/models"
 	"io"
+	"log"
 	"net/http"
 	"strings"
 )
@@ -191,13 +192,18 @@ func (s *DeepSeekService) ChatWithHistory(sgf, question string, history []Histor
 	sb.WriteString("\n\n")
 
 	if kataGoData != nil {
-		sb.WriteString(kataGoDataToNaturalLanguage(kataGoData))
+		kataText := kataGoDataToNaturalLanguage(kataGoData)
+		log.Printf("[DeepSeek] kataGoNatural=%q", kataText)
+		sb.WriteString(kataText)
 		sb.WriteString("\n\n")
 	}
 
 	sb.WriteString(question)
 
-	return s.chatWithRawPrompt("", sb.String(), history)
+	userMsg := sb.String()
+	log.Printf("[DeepSeek] finalUserPrompt (first 500 chars): %.500s", userMsg)
+
+	return s.chatWithRawPrompt("", userMsg, history)
 }
 
 // kataGoDataToNaturalLanguage 把 KataGo 数据转为自然语言
@@ -218,7 +224,7 @@ func kataGoDataToNaturalLanguage(d *KataGoChatData) string {
 
 	// AI推荐下一手
 	if d.BestMove != "" {
-		fmt.Fprintf(&sb, "AI推荐：D%s\n", d.BestMove)
+		fmt.Fprintf(&sb, "AI推荐：%s\n", d.BestMove)
 	}
 
 	// 目差
@@ -237,7 +243,7 @@ func kataGoDataToNaturalLanguage(d *KataGoChatData) string {
 			if i >= 3 {
 				break
 			}
-			fmt.Fprintf(&sb, "D%s(%.0f%%) ", cm.Move, cm.Winrate*100)
+			fmt.Fprintf(&sb, "%s(%.0f%%) ", cm.Move, cm.Winrate*100)
 		}
 		sb.WriteString("\n")
 	}
